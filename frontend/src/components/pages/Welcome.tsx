@@ -14,6 +14,7 @@ import {
 
 interface WelcomeProps {
   onGetStarted: () => void;
+   onClientPortal: () => void;
 }
 
 const features = [
@@ -58,7 +59,7 @@ const benefits = [
   'Mobile-responsive access'
 ];
 
-export function Welcome({ onGetStarted }: WelcomeProps) {
+export function Welcome({ onGetStarted, onClientPortal }: WelcomeProps) {
   return (
     <div  className="min-h-screen bg-cover bg-center bg-no-repeat absolute inset-0 bg-gradient-to-br from-white/70 via-white/60 to-white/50"
   style={{ backgroundImage: `url(${dolamo})` }}>
@@ -95,12 +96,13 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
   <ArrowRight className="w-5 h-5" />
 </Button>
 
-              <Button 
+             <Button 
                 variant="outline" 
                 size="lg"
+                onClick={onClientPortal}
                 className="text-base px-8 py-3"
               >
-                Learn More
+                Client Portal
               </Button>
             </div>
           </div>

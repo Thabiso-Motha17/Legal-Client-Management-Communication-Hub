@@ -42,7 +42,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
-              LegalHub
+              Dolamo Attorneys
             </span>
           </div>
           <Button variant="ghost" onClick={onBackToWelcome} className="gap-2 text-amber-600 hover:text-amber-700">
