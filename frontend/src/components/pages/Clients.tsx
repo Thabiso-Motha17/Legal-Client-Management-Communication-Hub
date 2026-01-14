@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader} from '../ui/Cards';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { Search, Plus, Eye, Mail, Phone, Briefcase, User } from 'lucide-react';
+import { Search, Plus, Eye, Mail, Phone, Briefcase, User, X, Building, UserPlus } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -18,94 +18,177 @@ interface Client {
   lastContact: string;
 }
 
-const mockClients: Client[] = [
-  {
-    id: '1',
-    name: 'James Henderson',
-    email: 'james.henderson@email.com',
-    phone: '(555) 123-4567',
-    type: 'individual',
-    activeCases: 1,
-    totalCases: 1,
-    status: 'active',
-    joinedDate: 'Dec 15, 2025',
-    lastContact: '2 hours ago'
-  },
-  {
-    id: '2',
-    name: 'Maria Martinez',
-    email: 'maria.martinez@email.com',
-    phone: '(555) 234-5678',
-    type: 'individual',
-    activeCases: 1,
-    totalCases: 1,
-    status: 'active',
-    joinedDate: 'Jan 2, 2026',
-    lastContact: '1 day ago'
-  },
-  {
-    id: '3',
-    name: 'Thompson Industries LLC',
-    email: 'legal@thompsonind.com',
-    phone: '(555) 345-6789',
-    company: 'Thompson Industries',
-    type: 'business',
-    activeCases: 1,
-    totalCases: 3,
-    status: 'active',
-    joinedDate: 'Mar 10, 2025',
-    lastContact: '3 days ago'
-  },
-  {
-    id: '4',
-    name: 'Robert Wilson',
-    email: 'r.wilson@email.com',
-    phone: '(555) 456-7890',
-    type: 'individual',
-    activeCases: 1,
-    totalCases: 2,
-    status: 'active',
-    joinedDate: 'Oct 5, 2025',
-    lastContact: '2 days ago'
-  },
-  {
-    id: '5',
-    name: 'Anderson Family Trust',
-    email: 'anderson.trust@email.com',
-    phone: '(555) 567-8901',
-    company: 'Anderson Family Trust',
-    type: 'business',
-    activeCases: 0,
-    totalCases: 2,
-    status: 'active',
-    joinedDate: 'Sep 12, 2025',
-    lastContact: '1 week ago'
-  },
-  {
-    id: '6',
-    name: 'Parker Technologies Inc',
-    email: 'legal@parkertech.com',
-    phone: '(555) 678-9012',
-    company: 'Parker Technologies',
-    type: 'business',
-    activeCases: 0,
-    totalCases: 1,
-    status: 'inactive',
-    joinedDate: 'Mar 8, 2025',
-    lastContact: '3 months ago'
-  }
-];
-
 export function Clients() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [showAddClientForm, setShowAddClientForm] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  
+  const [newClient, setNewClient] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    type: 'individual' as 'individual' | 'business',
+    status: 'active' as 'active' | 'inactive'
+  });
 
-  const filteredClients = mockClients.filter(client => {
+  // Initial mock clients
+  const initialClients: Client[] = [
+    {
+      id: '1',
+      name: 'James Henderson',
+      email: 'james.henderson@email.com',
+      phone: '(555) 123-4567',
+      type: 'individual',
+      activeCases: 1,
+      totalCases: 1,
+      status: 'active',
+      joinedDate: 'Dec 15, 2025',
+      lastContact: '2 hours ago'
+    },
+    {
+      id: '2',
+      name: 'Maria Martinez',
+      email: 'maria.martinez@email.com',
+      phone: '(555) 234-5678',
+      type: 'individual',
+      activeCases: 1,
+      totalCases: 1,
+      status: 'active',
+      joinedDate: 'Jan 2, 2026',
+      lastContact: '1 day ago'
+    },
+    {
+      id: '3',
+      name: 'Thompson Industries LLC',
+      email: 'legal@thompsonind.com',
+      phone: '(555) 345-6789',
+      company: 'Thompson Industries',
+      type: 'business',
+      activeCases: 1,
+      totalCases: 3,
+      status: 'active',
+      joinedDate: 'Mar 10, 2025',
+      lastContact: '3 days ago'
+    },
+    {
+      id: '4',
+      name: 'Robert Wilson',
+      email: 'r.wilson@email.com',
+      phone: '(555) 456-7890',
+      type: 'individual',
+      activeCases: 1,
+      totalCases: 2,
+      status: 'active',
+      joinedDate: 'Oct 5, 2025',
+      lastContact: '2 days ago'
+    },
+    {
+      id: '5',
+      name: 'Anderson Family Trust',
+      email: 'anderson.trust@email.com',
+      phone: '(555) 567-8901',
+      company: 'Anderson Family Trust',
+      type: 'business',
+      activeCases: 0,
+      totalCases: 2,
+      status: 'active',
+      joinedDate: 'Sep 12, 2025',
+      lastContact: '1 week ago'
+    },
+    {
+      id: '6',
+      name: 'Parker Technologies Inc',
+      email: 'legal@parkertech.com',
+      phone: '(555) 678-9012',
+      company: 'Parker Technologies',
+      type: 'business',
+      activeCases: 0,
+      totalCases: 1,
+      status: 'inactive',
+      joinedDate: 'Mar 8, 2025',
+      lastContact: '3 months ago'
+    }
+  ];
+
+  useEffect(() => {
+    setClients(initialClients);
+  }, []);
+
+  const filteredClients = clients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          client.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || client.type === typeFilter;
     return matchesSearch && matchesType;
   });
+
+  const formatDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleAddClient = () => {
+    if (!newClient.name || !newClient.email) {
+      alert('Please fill in required fields (Name and Email)');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newClient.email)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    // If type is business, require company name
+    if (newClient.type === 'business' && !newClient.company.trim()) {
+      alert('Company name is required for business clients');
+      return;
+    }
+
+    const newClientObj: Client = {
+      id: (clients.length + 1).toString(),
+      name: newClient.name,
+      email: newClient.email,
+      phone: newClient.phone || 'Not provided',
+      company: newClient.type === 'business' ? newClient.company : undefined,
+      type: newClient.type,
+      activeCases: 0,
+      totalCases: 0,
+      status: newClient.status,
+      joinedDate: formatDate(),
+      lastContact: 'Just now'
+    };
+
+    setClients([...clients, newClientObj]);
+    
+    // Reset form
+    setNewClient({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      type: 'individual',
+      status: 'active'
+    });
+    
+    setShowAddClientForm(false);
+    
+    // Show success message
+    alert(`Client "${newClientObj.name}" added successfully!`);
+  };
+
+  const resetForm = () => {
+    setNewClient({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      type: 'individual',
+      status: 'active'
+    });
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -114,11 +197,182 @@ export function Clients() {
           <h1 className="text-foreground mb-1">Clients</h1>
           <p className="text-muted-foreground text-sm">Manage client relationships and information</p>
         </div>
-        <Button variant="primary" className="gap-2">
+        <Button 
+          variant="primary" 
+          className="gap-2"
+          onClick={() => setShowAddClientForm(true)}
+        >
           <Plus className="w-4 h-4" />
           Add Client
         </Button>
       </div>
+
+      {/* Add Client Modal */}
+      {showAddClientForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <UserPlus className="w-6 h-6 text-primary" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Add New Client</h2>
+                    <p className="text-sm text-muted-foreground">Add a new client to the system</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowAddClientForm(false);
+                    resetForm();
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Client Type Selection */}
+              <div>
+                <label className="text-sm font-medium mb-3 block">Client Type *</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setNewClient({...newClient, type: 'individual'})}
+                    className={`p-4 border rounded-lg text-left transition-all ${
+                      newClient.type === 'individual'
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-foreground">Individual</h4>
+                        <p className="text-xs text-muted-foreground">Single person client</p>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewClient({...newClient, type: 'business'})}
+                    className={`p-4 border rounded-lg text-left transition-all ${
+                      newClient.type === 'business'
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Building className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-foreground">Business</h4>
+                        <p className="text-xs text-muted-foreground">Company or organization</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Client Information */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Name */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Full Name *</label>
+                    <input
+                      type="text"
+                      value={newClient.name}
+                      onChange={(e) => setNewClient({...newClient, name: e.target.value})}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="John Smith"
+                      required
+                    />
+                  </div>
+                  
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Email Address *</label>
+                    <input
+                      type="email"
+                      value={newClient.email}
+                      onChange={(e) => setNewClient({...newClient, email: e.target.value})}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="john@example.com"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Company (only for business) */}
+                {newClient.type === 'business' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Company Name *</label>
+                    <input
+                      type="text"
+                      value={newClient.company}
+                      onChange={(e) => setNewClient({...newClient, company: e.target.value})}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="ABC Corporation"
+                      required
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={newClient.phone}
+                      onChange={(e) => setNewClient({...newClient, phone: e.target.value})}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                  
+                  {/* Status */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
+                    <select
+                      value={newClient.status}
+                      onChange={(e) => setNewClient({...newClient, status: e.target.value as 'active' | 'inactive'})}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowAddClientForm(false);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddClient}
+                  className="gap-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add Client
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -244,6 +498,18 @@ export function Clients() {
         <div className="text-center py-12">
           <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">No clients found matching your search criteria.</p>
+          {searchQuery || typeFilter !== 'all' ? (
+            <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filter</p>
+          ) : (
+            <Button 
+              variant="outline" 
+              className="mt-4 gap-2"
+              onClick={() => setShowAddClientForm(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Your First Client
+            </Button>
+          )}
         </div>
       )}
     </div>

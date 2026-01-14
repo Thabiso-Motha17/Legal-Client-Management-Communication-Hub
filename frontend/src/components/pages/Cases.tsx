@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { Search, Filter, Eye, Plus, Calendar, User } from 'lucide-react';
+import { Search, Filter, Eye, Plus, Calendar, User, X, FileDigit, Hash, Tag, AlertCircle, Users, CalendarCheck } from 'lucide-react';
 import { CaseDetail } from './CaseDetail';
 
 interface Case {
   id: string;
+  FileNo: string;
   caseNumber: string;
   title: string;
   client: string;
@@ -18,91 +19,219 @@ interface Case {
   nextDeadline?: string;
 }
 
-const mockCases: Case[] = [
-  {
-    id: '1',
-    caseNumber: 'CAS-2026-001',
-    title: 'Henderson v. State Corp',
-    client: 'James Henderson',
-    type: 'Corporate Litigation',
-    status: 'active',
-    priority: 'high',
-    assignedTo: 'Sarah Mitchell',
-    dateOpened: 'Dec 15, 2025',
-    nextDeadline: 'Jan 10, 2026'
-  },
-  {
-    id: '2',
-    caseNumber: 'CAS-2026-002',
-    title: 'Martinez Estate Planning',
-    client: 'Maria Martinez',
-    type: 'Estate Planning',
-    status: 'active',
-    priority: 'medium',
-    assignedTo: 'Michael Chen',
-    dateOpened: 'Jan 2, 2026',
-    nextDeadline: 'Jan 12, 2026'
-  },
-  {
-    id: '3',
-    caseNumber: 'CAS-2025-089',
-    title: 'Thompson Contract Dispute',
-    client: 'Thompson Industries LLC',
-    type: 'Contract Law',
-    status: 'active',
-    priority: 'medium',
-    assignedTo: 'Sarah Mitchell',
-    dateOpened: 'Nov 20, 2025',
-    nextDeadline: 'Jan 15, 2026'
-  },
-  {
-    id: '4',
-    caseNumber: 'CAS-2025-078',
-    title: 'Wilson v. Metro Insurance',
-    client: 'Robert Wilson',
-    type: 'Insurance Claims',
-    status: 'pending',
-    priority: 'low',
-    assignedTo: 'Jennifer Lee',
-    dateOpened: 'Oct 5, 2025',
-    nextDeadline: 'Feb 15, 2026'
-  },
-  {
-    id: '5',
-    caseNumber: 'CAS-2025-067',
-    title: 'Anderson Real Estate Transaction',
-    client: 'Anderson Family Trust',
-    type: 'Real Estate',
-    status: 'on-hold',
-    priority: 'low',
-    assignedTo: 'Michael Chen',
-    dateOpened: 'Sep 12, 2025'
-  },
-  {
-    id: '6',
-    caseNumber: 'CAS-2025-023',
-    title: 'Parker Intellectual Property',
-    client: 'Parker Technologies Inc',
-    type: 'IP Law',
-    status: 'closed',
-    priority: 'medium',
-    assignedTo: 'Sarah Mitchell',
-    dateOpened: 'Mar 8, 2025'
-  }
-];
-
 export function Cases() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [showAddCaseForm, setShowAddCaseForm] = useState(false);
+  const [cases, setCases] = useState<Case[]>([]);
+  
+  // Simulate current logged in user
+  const currentUser = 'David Wilson';
+  
+  const [newCase, setNewCase] = useState({
+    fileNo: '',
+    caseNumber: '',
+    title: '',
+    client: '',
+    type: '',
+    status: 'active' as 'active' | 'pending' | 'closed' | 'on-hold',
+    priority: 'medium' as 'high' | 'medium' | 'low',
+    assignedTo: currentUser,
+    nextDeadline: ''
+  });
 
-  const filteredCases = mockCases.filter(c => {
+  // Initial mock cases
+  const initialCases: Case[] = [
+    {
+      id: '1',
+      FileNo: 'FIL-2026-001',
+      caseNumber: 'CAS-2026-001',
+      title: 'Henderson v. State Corp',
+      client: 'James Henderson',
+      type: 'Corporate Litigation',
+      status: 'active',
+      priority: 'high',
+      assignedTo: 'Sarah Mitchell',
+      dateOpened: 'Dec 15, 2025',
+      nextDeadline: 'Jan 10, 2026'
+    },
+    {
+      id: '2',
+      FileNo: 'FIL-2026-002',
+      caseNumber: 'CAS-2026-002',
+      title: 'Martinez Estate Planning',
+      client: 'Maria Martinez',
+      type: 'Estate Planning',
+      status: 'active',
+      priority: 'medium',
+      assignedTo: 'Michael Chen',
+      dateOpened: 'Jan 2, 2026',
+      nextDeadline: 'Jan 12, 2026'
+    },
+    {
+      id: '3',
+      FileNo: 'FIL-2025-089',
+      caseNumber: 'CAS-2025-089',
+      title: 'Thompson Contract Dispute',
+      client: 'Thompson Industries LLC',
+      type: 'Contract Law',
+      status: 'active',
+      priority: 'medium',
+      assignedTo: 'Sarah Mitchell',
+      dateOpened: 'Nov 20, 2025',
+      nextDeadline: 'Jan 15, 2026'
+    },
+    {
+      id: '4',
+      FileNo: 'FIL-2025-078',
+      caseNumber: 'CAS-2025-078',
+      title: 'Wilson v. Metro Insurance',
+      client: 'Robert Wilson',
+      type: 'Insurance Claims',
+      status: 'pending',
+      priority: 'low',
+      assignedTo: 'Jennifer Lee',
+      dateOpened: 'Oct 5, 2025',
+      nextDeadline: 'Feb 15, 2026'
+    },
+    {
+      id: '5',
+      FileNo: 'FIL-2025-067',
+      caseNumber: 'CAS-2025-067',
+      title: 'Anderson Real Estate Transaction',
+      client: 'Anderson Family Trust',
+      type: 'Real Estate',
+      status: 'on-hold',
+      priority: 'low',
+      assignedTo: 'Michael Chen',
+      dateOpened: 'Sep 12, 2025'
+    },
+    {
+      id: '6',
+      FileNo: 'FIL-2025-023',
+      caseNumber: 'CAS-2025-023',
+      title: 'Parker Intellectual Property',
+      client: 'Parker Technologies Inc',
+      type: 'IP Law',
+      status: 'closed',
+      priority: 'medium',
+      assignedTo: 'Sarah Mitchell',
+      dateOpened: 'Mar 8, 2025'
+    }
+  ];
+
+  useEffect(() => {
+    setCases(initialCases);
+  }, []);
+
+  const filteredCases = cases.filter(c => {
     const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          c.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         c.caseNumber.toLowerCase().includes(searchQuery.toLowerCase());
+                         c.caseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         c.FileNo.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Helper functions
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getDefaultDeadline = () => {
+    const today = new Date();
+    today.setDate(today.getDate() + 30);
+    return today.toISOString().split('T')[0];
+  };
+
+  const handleAddCase = () => {
+    if (!newCase.title || !newCase.client || !newCase.type || !newCase.fileNo || !newCase.caseNumber) {
+      alert('Please fill in all required fields (Title, Client, Type, File Number, Case Number)');
+      return;
+    }
+
+    // Check if File Number already exists
+    if (cases.some(c => c.FileNo === newCase.fileNo)) {
+      alert(`File Number "${newCase.fileNo}" already exists. Please use a unique File Number.`);
+      return;
+    }
+
+    // Check if Case Number already exists
+    if (cases.some(c => c.caseNumber === newCase.caseNumber)) {
+      alert(`Case Number "${newCase.caseNumber}" already exists. Please use a unique Case Number.`);
+      return;
+    }
+
+    const newCaseObj: Case = {
+      id: (cases.length + 1).toString(),
+      FileNo: newCase.fileNo,
+      caseNumber: newCase.caseNumber,
+      title: newCase.title,
+      client: newCase.client,
+      type: newCase.type,
+      status: newCase.status,
+      priority: newCase.priority,
+      assignedTo: newCase.assignedTo,
+      dateOpened: getTodayDate(),
+      nextDeadline: newCase.nextDeadline ? formatDateDisplay(newCase.nextDeadline) : undefined
+    };
+
+    setCases([...cases, newCaseObj]);
+    resetNewCaseForm();
+    setShowAddCaseForm(false);
+    
+    alert(`Case "${newCaseObj.title}" added successfully!`);
+  };
+
+  const resetNewCaseForm = () => {
+    setNewCase({
+      fileNo: '',
+      caseNumber: '',
+      title: '',
+      client: '',
+      type: '',
+      status: 'active',
+      priority: 'medium',
+      assignedTo: currentUser,
+      nextDeadline: getDefaultDeadline()
+    });
+  };
+
+  const formatDateDisplay = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const caseTypes = [
+    'Corporate Litigation',
+    'Estate Planning',
+    'Contract Law',
+    'Insurance Claims',
+    'Real Estate',
+    'IP Law',
+    'Family Law',
+    'Criminal Defense',
+    'Personal Injury',
+    'Employment Law',
+    'Tax Law',
+    'Bankruptcy',
+    'Immigration Law',
+    'Environmental Law'
+  ];
+
+  const teamMembers = [
+    'Sarah Mitchell',
+    'Michael Chen',
+    'Jennifer Lee',
+    'David Wilson',
+    'Emma Roberts',
+    'Robert Chen',
+    'Lisa Wang',
+    'James Miller',
+    'Alex Johnson'
+  ];
 
   if (selectedCase) {
     return <CaseDetail case={selectedCase} onBack={() => setSelectedCase(null)} />;
@@ -134,11 +263,218 @@ export function Cases() {
           <h1 className="text-foreground mb-1">Cases</h1>
           <p className="text-muted-foreground text-sm">Manage and track all legal cases</p>
         </div>
-        <Button variant="primary" className="gap-2">
+        <Button 
+          variant="primary" 
+          className="gap-2"
+          onClick={() => setShowAddCaseForm(true)}
+        >
           <Plus className="w-4 h-4" />
           New Case
         </Button>
       </div>
+
+      {/* Add Case Modal */}
+      {showAddCaseForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <Plus className="w-6 h-6 text-primary" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Add New Case</h2>
+                    <p className="text-sm text-muted-foreground">Create a new case in the system</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowAddCaseForm(false);
+                    resetNewCaseForm();
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Case Numbers */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* File Number */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <FileDigit className="w-4 h-4" />
+                    File Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCase.fileNo}
+                    onChange={(e) => setNewCase({...newCase, fileNo: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="FIL-2026-001"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Internal file reference number</p>
+                </div>
+                
+                {/* Case Number */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Hash className="w-4 h-4" />
+                    Case Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={newCase.caseNumber}
+                    onChange={(e) => setNewCase({...newCase, caseNumber: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="CAS-2026-001"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Public-facing case identifier</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Title */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Case Title *</label>
+                  <input
+                    type="text"
+                    value={newCase.title}
+                    onChange={(e) => setNewCase({...newCase, title: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Enter case title"
+                    required
+                  />
+                </div>
+                
+                {/* Client */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Client *</label>
+                  <input
+                    type="text"
+                    value={newCase.client}
+                    onChange={(e) => setNewCase({...newCase, client: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Enter client name"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Case Type */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Tag className="w-4 h-4" />
+                    Case Type *
+                  </label>
+                  <select
+                    value={newCase.type}
+                    onChange={(e) => setNewCase({...newCase, type: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
+                  >
+                    <option value="">Select type...</option>
+                    {caseTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Status */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={newCase.status}
+                    onChange={(e) => setNewCase({...newCase, status: e.target.value as any})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="active">Active</option>
+                    <option value="pending">Pending</option>
+                    <option value="on-hold">On Hold</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+                
+                {/* Priority */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Priority
+                  </label>
+                  <select
+                    value={newCase.priority}
+                    onChange={(e) => setNewCase({...newCase, priority: e.target.value as any})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Assigned To */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Assigned To
+                  </label>
+                  <select
+                    value={newCase.assignedTo}
+                    onChange={(e) => setNewCase({...newCase, assignedTo: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {teamMembers.map((member) => (
+                      <option key={member} value={member}>{member}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {/* Next Deadline */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <CalendarCheck className="w-4 h-4" />
+                    Next Deadline
+                  </label>
+                  <input
+                    type="date"
+                    value={newCase.nextDeadline}
+                    onChange={(e) => setNewCase({...newCase, nextDeadline: e.target.value})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowAddCaseForm(false);
+                    resetNewCaseForm();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddCase}
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Case
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -206,7 +542,10 @@ export function Cases() {
                 {filteredCases.map((caseItem) => (
                   <tr key={caseItem.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-mono text-foreground">{caseItem.caseNumber}</span>
+                      <div>
+                        <span className="text-sm font-mono text-foreground">{caseItem.caseNumber}</span>
+                        <p className="text-xs text-muted-foreground">{caseItem.FileNo}</p>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div>
@@ -265,6 +604,18 @@ export function Cases() {
       {filteredCases.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No cases found matching your search criteria.</p>
+          {searchQuery || statusFilter !== 'all' ? (
+            <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filter</p>
+          ) : (
+            <Button 
+              variant="outline" 
+              className="mt-4 gap-2"
+              onClick={() => setShowAddCaseForm(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Your First Case
+            </Button>
+          )}
         </div>
       )}
     </div>

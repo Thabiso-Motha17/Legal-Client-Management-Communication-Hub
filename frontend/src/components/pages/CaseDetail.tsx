@@ -13,6 +13,7 @@ import {
 
 interface Case {
   id: string;
+  FileNo: string;
   caseNumber: string;
   title: string;
   client: string;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { Search, Filter, Download, Eye, Send, Plus } from 'lucide-react';
+import { Search, Filter, Download, Eye } from 'lucide-react';
 import { FaMoneyBillAlt } from 'react-icons/fa';
 
 interface Invoice {
@@ -145,10 +145,6 @@ export function Billing() {
           <h1 className="text-foreground mb-1">Billing & Payments</h1>
           <p className="text-muted-foreground text-sm">Track invoices and payment status</p>
         </div>
-        <Button variant="primary" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Create Invoice
-        </Button>
       </div>
 
       {/* Stats Grid */}
@@ -269,11 +265,6 @@ export function Billing() {
                         <Button variant="ghost" size="sm" aria-label="Download">
                           <Download className="w-4 h-4" />
                         </Button>
-                        {invoice.status === 'pending' && (
-                          <Button variant="ghost" size="sm" aria-label="Send Reminder">
-                            <Send className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                     </td>
                   </tr>

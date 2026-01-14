@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 import { ClientDashboard } from './ClientDashboard';
-import { ClientCase } from './ClientCase';
+import { ClientCases } from './ClientCase';
 import { ClientDocuments } from './ClientDocuments';
 import { ClientMessages } from './ClientMessages';
 import { ClientBilling } from './ClientBilling';
@@ -29,7 +29,7 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
 
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home },
-    { id: 'case', name: 'My Case', icon: Briefcase },
+    { id: 'case', name: 'My Cases', icon: Briefcase },
     { id: 'documents', name: 'Documents', icon: FileText },
     { id: 'messages', name: 'Messages', icon: MessageSquare, badge: 1 },
     { id: 'billing', name: 'Billing', icon: CreditCard }
@@ -40,7 +40,7 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
       case 'dashboard':
         return <ClientDashboard onNavigate={setCurrentPage} />;
       case 'case':
-        return <ClientCase />;
+        return <ClientCases />;
       case 'documents':
         return <ClientDocuments />;
       case 'messages':
@@ -80,7 +80,7 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
               </div>
               <div>
                 <h2 className="text-sm font-bold bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent">
-                  Dolamo Attorneys
+                  Stand Firm
                 </h2>
                 <p className="text-xs text-stone-500">Client Portal</p>
               </div>
@@ -92,15 +92,6 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
-
-          {/* Case Info */}
-          <div className="px-6 py-4 bg-amber-50 border-b border-stone-200">
-            <p className="text-xs text-stone-500 mb-1">Your Case</p>
-            <p className="text-sm font-medium text-stone-800">
-              Johnson Estate Planning
-            </p>
-            <p className="text-xs text-stone-500 mt-1">CAS-2026-001</p>
           </div>
 
           {/* Navigation */}

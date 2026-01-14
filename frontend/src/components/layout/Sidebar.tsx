@@ -1,12 +1,9 @@
 import { 
   LayoutDashboard, 
   Briefcase, 
-  Users, 
-  MessageSquare, 
+  Users,  
   FileText, 
-  Calendar, 
-  CreditCard, 
-  BarChart3, 
+  CreditCard,  
   Settings 
 } from 'lucide-react';
 
@@ -19,11 +16,8 @@ const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'cases', label: 'Cases', icon: Briefcase },
   { id: 'clients', label: 'Clients', icon: Users },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
   { id: 'documents', label: 'Documents', icon: FileText },
-  { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'billing', label: 'Billing & Payments', icon: CreditCard },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -33,7 +27,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-amber-500 text-xl font-bold tracking-tight bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
-          Dolamo Attorneys
+          Stand Firm
         </h1>
         <p className="text-stone-500 text-xs mt-1">Law Firm Management</p>
       </div>

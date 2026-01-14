@@ -12,7 +12,8 @@ import {
   Eye,
   MoreVertical,
   ChevronRight,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 
 interface Document {
@@ -27,7 +28,7 @@ interface Document {
   folder: string;
 }
 
-const mockDocuments: Document[] = [
+const initialDocuments: Document[] = [
   {
     id: '1',
     name: 'Complaint - Final.pdf',
@@ -96,21 +97,46 @@ const mockDocuments: Document[] = [
   }
 ];
 
-const folders = [
-  { name: 'Legal Filings', count: 1, icon: Folder },
-  { name: 'Contracts', count: 1, icon: Folder },
-  { name: 'Discovery', count: 1, icon: Folder },
-  { name: 'Estate Planning', count: 1, icon: Folder },
-  { name: 'Evidence', count: 1, icon: Folder },
-  { name: 'Internal Documents', count: 1, icon: Folder }
+interface UploadFormData {
+  name: string;
+  file: File | null;
+  type: string;
+  status: 'draft' | 'final' | 'signed' | 'pending-review';
+  case: string;
+  folder: string;
+}
+
+const initialFolders = [
+  { name: 'Receipts', count: 0, icon: Folder },
+  { name: 'Letters', count: 0, icon: Folder },
+  { name: 'Pleadings', count: 0, icon: Folder },
+  { name: 'Correspondences', count: 0, icon: Folder },
 ];
 
 export function Documents() {
+  const [documents, setDocuments] = useState<Document[]>(initialDocuments);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  const [uploadForm, setUploadForm] = useState<UploadFormData>({
+    name: '',
+    file: null,
+    type: 'PDF',
+    status: 'draft',
+    case: 'CAS-2026-001',
+    folder: 'Receipts'
+  });
 
-  const filteredDocuments = mockDocuments.filter(doc => {
+  const folders = initialFolders.map(folder => ({
+    ...folder,
+    count: documents.filter(doc => doc.folder === folder.name).length
+  }));
+
+  const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          doc.case.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
@@ -138,14 +164,281 @@ export function Documents() {
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const fileSize = formatFileSize(file.size);
+      const fileExtension = file.name.split('.').pop()?.toUpperCase() || 'PDF';
+      
+      setUploadForm(prev => ({
+        ...prev,
+        file,
+        name: file.name,
+        type: fileExtension,
+        size: fileSize
+      }));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadForm.file || !uploadForm.name.trim()) {
+      alert('Please select a file and provide a document name');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 95) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + 5;
+      });
+    }, 100);
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    clearInterval(progressInterval);
+    setUploadProgress(100);
+
+    // Create new document
+    const newDocument: Document = {
+      id: Date.now().toString(),
+      name: uploadForm.name,
+      type: uploadForm.type,
+      size: formatFileSize(uploadForm.file.size),
+      status: uploadForm.status,
+      case: uploadForm.case,
+      uploadedBy: 'Current User', // In real app, get from auth context
+      uploadedDate: new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      }),
+      folder: uploadForm.folder
+    };
+
+    // Add to documents list
+    setDocuments(prev => [newDocument, ...prev]);
+    
+    // Reset form and close modal
+    setTimeout(() => {
+      setIsUploading(false);
+      setUploadProgress(0);
+      setShowUploadModal(false);
+      setUploadForm({
+        name: '',
+        file: null,
+        type: 'PDF',
+        status: 'draft',
+        case: 'CAS-2026-001',
+        folder: 'Legal Filings'
+      });
+    }, 500);
+  };
+
+  const handleDownload = (document: Document) => {
+    // In a real app, this would download the actual file
+    console.log('Downloading document:', document.name);
+    alert(`Downloading ${document.name}`);
+  };
+
+  const handleView = (document: Document) => {
+    // In a real app, this would open a viewer or preview
+    console.log('Viewing document:', document.name);
+    alert(`Opening preview for ${document.name}`);
+  };
+
   return (
     <div className="p-8 space-y-6">
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-foreground">Upload Document</h2>
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="p-1 hover:bg-muted rounded-md transition-colors"
+                  disabled={isUploading}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Document Name
+                  </label>
+                  <input
+                    type="text"
+                    value={uploadForm.name}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Enter document name"
+                    disabled={isUploading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Select File
+                  </label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-upload"
+                      disabled={isUploading}
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className={`cursor-pointer flex flex-col items-center justify-center space-y-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploadForm.file ? uploadForm.file.name : 'Click to browse or drag and drop'}
+                      </span>
+                      {uploadForm.file && (
+                        <span className="text-xs text-muted-foreground">
+                          Size: {formatFileSize(uploadForm.file.size)}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Status
+                    </label>
+                    <select
+                      value={uploadForm.status}
+                      onChange={(e) => setUploadForm(prev => ({ 
+                        ...prev, 
+                        status: e.target.value as UploadFormData['status'] 
+                      }))}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isUploading}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="final">Final</option>
+                      <option value="signed">Signed</option>
+                      <option value="pending-review">Pending Review</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Case
+                    </label>
+                    <select
+                      value={uploadForm.case}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, case: e.target.value }))}
+                      className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      disabled={isUploading}
+                    >
+                      <option value="CAS-2026-001">CAS-2026-001</option>
+                      <option value="CAS-2026-002">CAS-2026-002</option>
+                      <option value="CAS-2025-089">CAS-2025-089</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Folder
+                  </label>
+                  <select
+                    value={uploadForm.folder}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, folder: e.target.value }))}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={isUploading}
+                  >
+                    {folders.map(folder => (
+                      <option key={folder.name} value={folder.name}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-foreground">Uploading...</span>
+                      <span className="text-muted-foreground">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowUploadModal(false)}
+                    disabled={isUploading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleUpload}
+                    disabled={isUploading || !uploadForm.file}
+                    className="gap-2"
+                  >
+                    {isUploading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Upload Document
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground mb-1">Document Management</h1>
           <p className="text-muted-foreground text-sm">Organize and manage case documents securely</p>
         </div>
-        <Button variant="primary" className="gap-2">
+        <Button 
+          variant="primary" 
+          className="gap-2"
+          onClick={() => setShowUploadModal(true)}
+        >
           <Upload className="w-4 h-4" />
           Upload Document
         </Button>
@@ -173,7 +466,9 @@ export function Documents() {
                 </div>
                 <ChevronRight className="w-4 h-4" />
               </button>
-              {folders.map((folder) => (
+              {folders
+                .filter(folder => folder.count >= 0 || selectedFolder === folder.name)
+                .map((folder) => (
                 <button
                   key={folder.name}
                   onClick={() => setSelectedFolder(folder.name)}
@@ -293,10 +588,18 @@ export function Documents() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleView(doc)}
+                            >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDownload(doc)}
+                            >
                               <Download className="w-4 h-4" />
                             </Button>
                             <Button variant="ghost" size="sm">
@@ -316,6 +619,14 @@ export function Documents() {
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No documents found matching your criteria.</p>
+              <Button 
+                variant="secondary" 
+                className="mt-4 gap-2"
+                onClick={() => setShowUploadModal(true)}
+              >
+                <Upload className="w-4 h-4" />
+                Upload Your First Document
+              </Button>
             </div>
           )}
         </div>

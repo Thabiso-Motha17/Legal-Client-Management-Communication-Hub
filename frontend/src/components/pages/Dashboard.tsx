@@ -18,13 +18,6 @@ const stats = [
     trend: 'up'
   },
   {
-    title: 'Unread Messages',
-    value: '8',
-    change: 'Requires attention',
-    icon: MessageSquare,
-    trend: 'neutral'
-  },
-  {
     title: 'Outstanding Payments',
     value: 'R42,750',
     change: '5 invoices pending',
@@ -95,14 +88,6 @@ const recentActivity = [
   },
   {
     id: 4,
-    type: 'message',
-    title: 'New client message',
-    description: 'Robert Anderson sent a message regarding consultation',
-    time: '6 hours ago',
-    user: 'Robert Anderson'
-  },
-  {
-    id: 5,
     type: 'case_update',
     title: 'Court date scheduled',
     description: 'Wilson v. Metro Insurance - Hearing set for Feb 15, 2026',

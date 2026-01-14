@@ -3,11 +3,12 @@ import type{ ReactNode } from 'react';
 interface CardProps {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
-export function Card({ children, className = '' }: CardProps) {
+export function Card({ children, className = '', onClick }: CardProps) {
   return (
-    <div className={`bg-card border border-border rounded-lg ${className}`}>
+    <div className={`bg-card border border-border rounded-lg ${className}`} onClick={onClick}>
       {children}
     </div>
   );

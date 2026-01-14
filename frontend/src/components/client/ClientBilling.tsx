@@ -1,20 +1,27 @@
-import { useState } from 'react';
+import { useState, useRef, type ChangeEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { 
-  Download, 
-  CreditCard,
+import {
+  Download,
   Calendar,
   CheckCircle,
   Clock,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Upload,
+  FileCheck,
+  AlertCircle,
+  Eye
 } from 'lucide-react';
-import { FaMoneyBillAlt } from 'react-icons/fa';
+import { FaMoneyBillAlt, FaUniversity } from 'react-icons/fa';
 
 export function ClientBilling() {
   const [selectedInvoice, setSelectedInvoice] = useState<number | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key: number]: File | null }>({});
+  const [uploadStatus, setUploadStatus] = useState<{ [key: number]: 'idle' | 'uploading' | 'success' | 'error' }>({});
+  const [uploadMessage, setUploadMessage] = useState<{ [key: number]: string }>({});
+  const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
 
   const billingOverview = {
     totalBilled: 12850.00,
@@ -88,30 +95,97 @@ export function ClientBilling() {
       id: 1,
       date: 'Dec 15, 2025',
       amount: 3250.00,
-      method: 'Credit Card (****4532)',
+      method: 'Bank Transfer',
       invoice: 'INV-2025-012',
-      status: 'Completed'
+      status: 'Verified',
+      proofUploaded: true
     },
     {
       id: 2,
       date: 'Nov 28, 2025',
       amount: 1875.00,
-      method: 'Credit Card (****4532)',
+      method: 'Bank Transfer',
       invoice: 'INV-2025-011',
-      status: 'Completed'
+      status: 'Verified',
+      proofUploaded: true
     },
     {
       id: 3,
       date: 'Nov 18, 2025',
       amount: 3275.00,
-      method: 'Credit Card (****4532)',
+      method: 'Bank Transfer',
       invoice: 'INV-2025-010',
-      status: 'Completed'
+      status: 'Verified',
+      proofUploaded: true
     }
   ];
 
+  const bankDetails = {
+    accountHolder: 'Smith & Associates Legal Firm',
+    bankName: 'First National Bank',
+    accountNumber: '1234 5678 9012',
+    branchCode: '250655',
+    reference: 'Your invoice number'
+  };
+
   const getStatusVariant = (status: string) => {
-    return status === 'Paid' ? 'success' : 'warning';
+    return status === 'Paid' ? 'success' : status === 'Verified' ? 'success' : 'warning';
+  };
+
+  const handleFileUpload = (invoiceId: number, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setUploadStatus({ ...uploadStatus, [invoiceId]: 'error' });
+      setUploadMessage({ ...uploadMessage, [invoiceId]: 'Please upload PDF, JPEG, or PNG files only' });
+      return;
+    }
+
+    // Check file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadStatus({ ...uploadStatus, [invoiceId]: 'error' });
+      setUploadMessage({ ...uploadMessage, [invoiceId]: 'File size must be less than 5MB' });
+      return;
+    }
+
+    setUploadedFiles({ ...uploadedFiles, [invoiceId]: file });
+    setUploadStatus({ ...uploadStatus, [invoiceId]: 'uploading' });
+    setUploadMessage({ ...uploadMessage, [invoiceId]: 'Uploading file...' });
+
+    // Simulate upload process
+    setTimeout(() => {
+      setUploadStatus({ ...uploadStatus, [invoiceId]: 'success' });
+      setUploadMessage({ ...uploadMessage, [invoiceId]: 'Proof of payment uploaded successfully! Our team will verify it shortly.' });
+
+      // In a real app, you would upload to your server here
+      console.log('Uploading file for invoice', invoiceId, file);
+    }, 1500);
+  };
+
+  const removeUploadedFile = (invoiceId: number) => {
+    const newUploadedFiles = { ...uploadedFiles };
+    delete newUploadedFiles[invoiceId];
+    setUploadedFiles(newUploadedFiles);
+    setUploadStatus({ ...uploadStatus, [invoiceId]: 'idle' });
+    setUploadMessage({ ...uploadMessage, [invoiceId]: '' });
+  };
+
+  const getFileIcon = (fileName: string) => {
+    if (fileName?.endsWith('.pdf')) return '📄';
+    if (fileName?.match(/\.(jpg|jpeg|png)$/i)) return '🖼️';
+    return '📎';
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'success': return <CheckCircle className="w-4 h-4 text-success" />;
+      case 'error': return <AlertCircle className="w-4 h-4 text-destructive" />;
+      case 'uploading': return <Clock className="w-4 h-4 text-warning animate-spin" />;
+      default: return null;
+    }
   };
 
   return (
@@ -119,7 +193,7 @@ export function ClientBilling() {
       {/* Header */}
       <div>
         <h1 className="text-foreground mb-2">Billing & Payments</h1>
-        <p className="text-muted-foreground">View invoices and manage payments</p>
+        <p className="text-muted-foreground">View invoices and upload proof of payment</p>
       </div>
 
       {/* Overview Cards */}
@@ -161,12 +235,24 @@ export function ClientBilling() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-accent/5 to-transparent border-accent/20">
+        <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-3">Quick Payment</p>
-            <Button variant="primary" className="w-full gap-2">
-              <CreditCard className="w-4 h-4" />
-              Pay Balance
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FaUniversity className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Bank Transfer</p>
+                <p className="text-xs text-muted-foreground">Preferred Payment Method</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setSelectedInvoice(invoices.find(inv => inv.status === 'Outstanding')?.id || null)}
+            >
+              <Upload className="w-4 h-4" />
+              Upload Proof of Payment
             </Button>
           </CardContent>
         </Card>
@@ -189,16 +275,14 @@ export function ClientBilling() {
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 flex-1">
-                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                            invoice.status === 'Paid' 
-                              ? 'bg-success/10' 
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${invoice.status === 'Paid'
+                              ? 'bg-success/10'
                               : 'bg-warning/10'
-                          }`}>
-                            <FileText className={`w-6 h-6 ${
-                              invoice.status === 'Paid' 
-                                ? 'text-success' 
+                            }`}>
+                            <FileText className={`w-6 h-6 ${invoice.status === 'Paid'
+                                ? 'text-success'
                                 : 'text-warning'
-                            }`} />
+                              }`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -237,10 +321,10 @@ export function ClientBilling() {
                         </div>
                       </div>
                     </button>
-                    
+
                     {/* Invoice Details */}
                     {selectedInvoice === invoice.id && (
-                      <div className="px-6 py-4 bg-muted/30 border-t border-border">
+                      <div className="px-6 py-4 bg-muted/30 border-t border-border space-y-4">
                         <h4 className="text-sm font-medium text-foreground mb-3">Invoice Details</h4>
                         <div className="space-y-2">
                           {invoice.items.map((item, index) => (
@@ -248,29 +332,136 @@ export function ClientBilling() {
                               <div className="flex-1">
                                 <p className="text-foreground">{item.description}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {item.hours} hours × ${item.rate}/hour
+                                  {item.hours} hours × R{item.rate}/hour
                                 </p>
                               </div>
-                              <p className="font-medium text-foreground">${item.amount.toLocaleString()}</p>
+                              <p className="font-medium text-foreground">R{item.amount.toLocaleString()}</p>
                             </div>
                           ))}
                           <div className="flex justify-between items-center pt-3 border-t border-border">
                             <p className="font-medium text-foreground">Total</p>
                             <p className="text-lg font-semibold text-foreground">
-                              ${invoice.amount.toLocaleString()}
+                              R{invoice.amount.toLocaleString()}
                             </p>
                           </div>
                         </div>
+
                         {invoice.status === 'Outstanding' && (
-                          <div className="flex gap-3 mt-4 pt-4 border-t border-border">
-                            <Button variant="primary" className="gap-2">
-                              <CreditCard className="w-4 h-4" />
-                              Pay Now
-                            </Button>
-                            <Button variant="outline" className="gap-2">
-                              <Download className="w-4 h-4" />
-                              Download PDF
-                            </Button>
+                          <div className="pt-4 border-t border-border">
+                            <div className="space-y-4">
+                              <div className="bg-warning/5 border border-warning/20 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                  <AlertCircle className="w-5 h-5 text-warning mt-0.5" />
+                                  <div>
+                                    <h5 className="font-medium text-foreground mb-1">Payment Required</h5>
+                                    <p className="text-sm text-muted-foreground">
+                                      Please make a bank transfer using the details below and upload your proof of payment.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Upload Section */}
+                              <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Upload className="w-4 h-4 text-primary" />
+                                  <p className="text-sm font-medium text-foreground">Upload Proof of Payment</p>
+                                </div>
+
+                                <input
+                                  type="file"
+                                  ref={el => {
+                                    fileInputRefs.current[invoice.id] = el;
+                                  }}
+                                  onChange={(e) => handleFileUpload(invoice.id, e)}
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  className="hidden"
+                                />
+
+                                {uploadedFiles[invoice.id] ? (
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xl">{getFileIcon(uploadedFiles[invoice.id]?.name || '')}</span>
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-medium text-foreground truncate">
+                                            {uploadedFiles[invoice.id]?.name}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {(uploadedFiles[invoice.id]?.size || 0) / 1024} KB
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeUploadedFile(invoice.id)}
+                                        >
+                                          Remove
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => uploadedFiles[invoice.id] && window.URL.createObjectURL(uploadedFiles[invoice.id]!)}
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    {uploadStatus[invoice.id] && (
+                                      <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${uploadStatus[invoice.id] === 'success'
+                                          ? 'bg-success/10 text-success'
+                                          : uploadStatus[invoice.id] === 'error'
+                                            ? 'bg-destructive/10 text-destructive'
+                                            : 'bg-warning/10 text-warning'
+                                        }`}>
+                                        {getStatusIcon(uploadStatus[invoice.id])}
+                                        {uploadMessage[invoice.id]}
+                                      </div>
+                                    )}
+
+                                    {uploadStatus[invoice.id] === 'success' && (
+                                      <Button
+                                        variant="primary"
+                                        className="w-full gap-2"
+                                        onClick={() => {
+                                          setSelectedInvoice(null);
+                                          setUploadStatus({ ...uploadStatus, [invoice.id]: 'idle' });
+                                          setUploadedFiles({ ...uploadedFiles, [invoice.id]: null });
+                                        }}
+                                      >
+                                        <FileCheck className="w-4 h-4" />
+                                        Done
+                                      </Button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <div
+                                      onClick={() => fileInputRefs.current[invoice.id]?.click()}
+                                      className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:bg-muted/30 transition-colors"
+                                    >
+                                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                                      <p className="text-sm font-medium text-foreground mb-1">
+                                        Click to upload proof of payment
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Upload PDF, JPG, or PNG (Max 5MB)
+                                      </p>
+                                    </div>
+
+                                    {uploadStatus[invoice.id] === 'error' && (
+                                      <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
+                                        <AlertCircle className="w-4 h-4" />
+                                        {uploadMessage[invoice.id]}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -284,34 +475,55 @@ export function ClientBilling() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Payment Methods */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Methods</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">Visa ****4532</p>
-                    <p className="text-xs text-muted-foreground">Expires 12/2027</p>
-                  </div>
-                  <Badge variant="secondary">Primary</Badge>
+          {/* Bank Details */}
+          <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <FaUniversity className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-foreground font-medium mb-1">Bank Transfer Details</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Use these details for EFT or bank transfers
+                  </p>
                 </div>
               </div>
-              <Button variant="outline" className="w-full">
-                Add Payment Method
-              </Button>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Bank:</span>
+                  <span className="text-sm font-medium text-foreground">{bankDetails.bankName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Account Holder:</span>
+                  <span className="text-sm font-medium text-foreground">{bankDetails.accountHolder}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Account Number:</span>
+                  <span className="text-sm font-medium text-foreground font-mono">{bankDetails.accountNumber}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Branch Code:</span>
+                  <span className="text-sm font-medium text-foreground">{bankDetails.branchCode}</span>
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Reference:</span>
+                    <span className="text-sm font-medium text-foreground">{bankDetails.reference}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use your invoice number as reference when making payment
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
           {/* Payment History */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Payments</CardTitle>
+              <CardTitle>Payment History</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
@@ -324,34 +536,64 @@ export function ClientBilling() {
                         </p>
                         <p className="text-xs text-muted-foreground">{payment.date}</p>
                       </div>
-                      <Badge variant="success" className="text-xs">
+                      <Badge variant="success" className="text-xs gap-1">
+                        <CheckCircle className="w-3 h-3" />
                         {payment.status}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">{payment.method}</p>
-                    <p className="text-xs text-muted-foreground">Invoice: {payment.invoice}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <FaUniversity className="w-3 h-3" />
+                      {payment.method}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                      <span>Invoice: {payment.invoice}</span>
+                      {payment.proofUploaded && (
+                        <span className="flex items-center gap-1 text-success">
+                          <FileCheck className="w-3 h-3" />
+                          Proof uploaded
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Billing Info */}
-          <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+          {/* Instructions */}
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <FaMoneyBillAlt className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <FaMoneyBillAlt className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <h3 className="text-foreground font-medium mb-1">Billing Information</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Invoices are issued monthly based on time and services provided.
-                  </p>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Payment due within 20 days of invoice date</li>
-                    <li>• Multiple payment methods accepted</li>
-                    <li>• All charges itemized by service</li>
+                  <h3 className="text-foreground font-medium mb-1">Payment Instructions</h3>
+                  <ul className="text-sm text-muted-foreground space-y-2">
+                    <li className="flex items-start gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs">1</span>
+                      </div>
+                      Make payment via bank transfer using the details provided
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs">2</span>
+                      </div>
+                      Use your invoice number as payment reference
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs">3</span>
+                      </div>
+                      Upload proof of payment (screenshot or receipt)
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs">4</span>
+                      </div>
+                      We'll verify and update your invoice status within 24 hours
+                    </li>
                   </ul>
                 </div>
               </div>
