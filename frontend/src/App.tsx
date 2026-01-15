@@ -5,13 +5,10 @@ import { Welcome } from './components/pages/Welcome';
 import { Login } from './components/pages/Login';
 import { ClientLayout } from './components/client/ClientLayout';
 import { Dashboard } from './components/pages/Dashboard';
-import { Cases } from './components/pages/Cases';
-import { Clients } from './components/pages/Clients';
-import { Documents } from './components/pages/Documents';
-import { Billing } from './components/pages/Billing';
 import { Settings } from './components/pages/Settings';
 import { Profile } from './components/pages/Profile';
 import { AssociateLayout } from './components/attorney/AttorneyLayout';
+import { UserSettings } from './components/pages/Users';
 
 type AppView = 'welcome' | 'login' | 'attorney-app' | 'client-app' | 'associate-app';
 
@@ -51,15 +48,9 @@ export default function App() {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
-      case 'cases':
-        return <Cases />;
-      case 'clients':
-        return <Clients />;
-      case 'documents':
-        return <Documents />;
-      case 'billing':
-        return <Billing />;
-      case 'settings':
+      case 'users':
+        return <UserSettings />;
+      case 'companies':
         return <Settings />;
       case 'profile':
         return <Profile />;

@@ -6,7 +6,6 @@ import {
   Briefcase, 
   Search,
   Filter,
-  User,
   Calendar,
   FileText,
   MessageSquare,
@@ -59,10 +58,11 @@ export function AssociateCases() {
     type: '',
     status: 'Active',
     priority: 'medium',
-    assignedTo: currentUser, // Default to current user
+    assignedTo: currentUser, 
     description: '',
     dateOpened: getTodayDate(),
-    deadline: getDefaultDeadline() // Default deadline 30 days from today
+    deadline: getDefaultDeadline(),
+    addedBy: '',
   });
 
   // Update dateOpened when form opens
@@ -85,21 +85,13 @@ export function AssociateCases() {
       caseNumber: 'CAS-2026-001',
       title: 'Johnson Estate Planning',
       client: 'John Johnson',
-      partner: 'Sarah Mitchell',
-      myRole: 'Lead Associate',
       type: 'Estate Planning',
       status: 'Active',
       priority: 'high',
       assignedTo: 'David Wilson',
       dateOpened: '2025-11-15',
       deadline: '2026-01-25',
-      budget: 80,
       description: 'Comprehensive estate planning including trust agreements, wills, and property transfers',
-      recentActivity: [
-        { date: 'Jan 13', action: 'Uploaded trust agreement draft v2' },
-        { date: 'Jan 12', action: 'Completed legal research on estate tax' },
-        { date: 'Jan 10', action: 'Client consultation meeting' }
-      ],
       addedBy: 'current-user',
       addedDate: 'Nov 15, 2025'
     },
@@ -109,21 +101,13 @@ export function AssociateCases() {
       caseNumber: 'CAS-2026-003',
       title: 'Corporate Merger - TechCo',
       client: 'TechCo Industries',
-      partner: 'Sarah Mitchell',
-      myRole: 'Associate',
       type: 'Corporate',
       status: 'Active',
       priority: 'high',
       assignedTo: 'Emma Roberts',
       dateOpened: '2025-12-01',
       deadline: '2026-02-01',
-      budget: 120,
       description: 'Corporate merger and acquisition legal documentation and due diligence',
-      recentActivity: [
-        { date: 'Jan 13', action: 'Reviewed merger contract sections 4-7' },
-        { date: 'Jan 11', action: 'Due diligence document review' },
-        { date: 'Jan 9', action: 'Meeting with corporate counsel' }
-      ],
       addedBy: 'current-user',
       addedDate: 'Dec 1, 2025'
     },
@@ -133,21 +117,13 @@ export function AssociateCases() {
       caseNumber: 'CAS-2025-087',
       title: 'Smith Contract Dispute',
       client: 'Smith LLC',
-      partner: 'Michael Chen',
-      myRole: 'Associate',
       type: 'Litigation',
       status: 'Active',
       priority: 'medium',
       assignedTo: 'Robert Chen',
       dateOpened: '2025-10-20',
       deadline: '2026-01-30',
-      budget: 40,
       description: 'Commercial contract dispute and negotiation support',
-      recentActivity: [
-        { date: 'Jan 12', action: 'Contract amendments drafted' },
-        { date: 'Jan 8', action: 'Client meeting notes uploaded' },
-        { date: 'Jan 5', action: 'Initial contract review completed' }
-      ],
       addedBy: 'another-user',
       addedDate: 'Oct 20, 2025'
     },
@@ -157,20 +133,13 @@ export function AssociateCases() {
       caseNumber: 'CAS-2025-072',
       title: 'Williams Trademark Filing',
       client: 'Williams Brands Inc',
-      partner: 'Michael Chen',
-      myRole: 'Associate',
       type: 'Intellectual Property',
       status: 'Active',
       priority: 'low',
       assignedTo: 'Lisa Wang',
       dateOpened: '2025-09-15',
       deadline: '2026-02-15',
-      budget: 30,
       description: 'Trademark registration and intellectual property protection',
-      recentActivity: [
-        { date: 'Jan 10', action: 'Filed trademark application' },
-        { date: 'Jan 3', action: 'Trademark search completed' }
-      ],
       addedBy: 'current-user',
       addedDate: 'Sep 15, 2025'
     },
@@ -180,19 +149,13 @@ export function AssociateCases() {
       caseNumber: 'CAS-2025-063',
       title: 'Davis Employment Agreement',
       client: 'Davis Consulting',
-      partner: 'Sarah Mitchell',
-      myRole: 'Associate',
       type: 'Employment',
       status: 'On Hold',
       priority: 'medium',
       assignedTo: 'James Miller',
       dateOpened: '2025-08-10',
       deadline: '2026-03-01',
-      budget: 25,
       description: 'Employment contract drafting and review',
-      recentActivity: [
-        { date: 'Dec 28', action: 'Contract draft submitted for review' }
-      ],
       addedBy: 'another-user',
       addedDate: 'Aug 10, 2025'
     }
@@ -200,7 +163,6 @@ export function AssociateCases() {
 
   const [cases, setCases] = useState(initialCases);
 
-  // Filter to show only cases added by the current user
   const userCases = cases.filter(c => c.addedBy === 'current-user');
 
   const filteredCases = userCases.filter(c => {
@@ -248,8 +210,6 @@ export function AssociateCases() {
       caseNumber: newCase.caseNo || generateCaseNumber(),
       title: newCase.title,
       client: newCase.client,
-      partner: 'Not Assigned',
-      myRole: 'Associate',
       type: newCase.type,
       status: newCase.status,
       priority: newCase.priority as 'high' | 'medium' | 'low',
@@ -258,9 +218,6 @@ export function AssociateCases() {
       deadline: newCase.deadline,
       budget: 0,
       description: newCase.description,
-      recentActivity: [
-        { date: 'Today', action: 'Case created and assigned' }
-      ],
       addedBy: 'current-user',
       addedDate: formatDateDisplay(newCase.dateOpened)
     };
@@ -293,14 +250,8 @@ export function AssociateCases() {
           type: newCase.type || c.type,
           status: newCase.status || c.status,
           priority: newCase.priority as 'high' | 'medium' | 'low',
-          // Assigned To remains unchanged (uneditable)
           description: newCase.description || c.description,
-          // Date Opened remains unchanged (uneditable)
           deadline: newCase.deadline || c.deadline,
-          recentActivity: [
-            { date: 'Today', action: 'Case details updated' },
-            ...c.recentActivity.slice(0, 2)
-          ]
         };
       }
       return c;
@@ -320,10 +271,11 @@ export function AssociateCases() {
       type: '',
       status: 'Active',
       priority: 'medium',
-      assignedTo: currentUser, // Reset to current user
+      assignedTo: currentUser, 
       description: '',
       dateOpened: getTodayDate(),
-      deadline: getDefaultDeadline()
+      deadline: getDefaultDeadline(),
+      addedBy: '',
     });
   };
 
@@ -340,7 +292,8 @@ export function AssociateCases() {
       assignedTo: caseItem.assignedTo, // Keep existing assignment
       description: caseItem.description,
       dateOpened: caseItem.dateOpened, // Keep existing date opened
-      deadline: caseItem.deadline // Keep existing deadline
+      deadline: caseItem.deadline, // Keep existing deadline
+      addedBy: caseItem.addedBy,
     });
   };
 
@@ -361,7 +314,6 @@ export function AssociateCases() {
 
   return (
     <div className="p-6 md:p-8 space-y-6">
-      {/* Header with Add Case button */}
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-foreground mb-2">My Cases</h1>
@@ -752,10 +704,6 @@ export function AssociateCases() {
 
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                         <div className="flex items-center gap-2">
-                          <User className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">Partner: {caseItem.partner}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
                           <Users className="w-3 h-3 text-muted-foreground" />
                           <span className="text-muted-foreground">Assigned: {caseItem.assignedTo}</span>
                         </div>
@@ -854,14 +802,6 @@ export function AssociateCases() {
                         <p className="text-sm font-medium text-foreground">{selectedCaseData.client}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Supervising Partner</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.partner}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">My Role</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.myRole}</p>
-                      </div>
-                      <div>
                         <p className="text-xs text-muted-foreground mb-1">Assigned To</p>
                         <p className="text-sm font-medium text-foreground">{selectedCaseData.assignedTo}</p>
                       </div>
@@ -887,24 +827,6 @@ export function AssociateCases() {
                           {selectedCaseData.addedBy === 'current-user' ? 'You' : 'Another Associate'}
                         </p>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Activity */}
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground mb-3">Recent Activity</h3>
-                    <div className="space-y-2">
-                      {selectedCaseData.recentActivity.map((activity, idx) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <FileText className="w-4 h-4 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm text-foreground">{activity.action}</p>
-                            <p className="text-xs text-muted-foreground">{activity.date}</p>
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
 

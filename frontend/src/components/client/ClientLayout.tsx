@@ -4,7 +4,6 @@ import {
   Briefcase,
   CreditCard,
   FileText,
-  MessageSquare,
   LogOut,
   ChevronDown,
   Menu,
@@ -31,7 +30,6 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
     { id: 'dashboard', name: 'Dashboard', icon: Home },
     { id: 'case', name: 'My Cases', icon: Briefcase },
     { id: 'documents', name: 'Documents', icon: FileText },
-    { id: 'messages', name: 'Messages', icon: MessageSquare, badge: 1 },
     { id: 'billing', name: 'Billing', icon: CreditCard }
   ];
 
@@ -124,21 +122,6 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
                   <span className="text-sm font-medium flex-1 text-left">
                     {item.name}
                   </span>
-
-                  {item.badge && (
-                    <span
-                      className={`
-                        px-2 py-0.5 rounded-full text-xs font-medium
-                        ${
-                          isActive
-                            ? 'bg-white text-amber-600'
-                            : 'bg-amber-100 text-amber-700'
-                        }
-                      `}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}

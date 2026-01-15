@@ -10,7 +10,7 @@ import {
   X,
   Shield,
   Users,
-  MessageSquare
+  Settings
 } from 'lucide-react';
 
 import { AssociateDashboard } from './AttorneyDashboard';
@@ -21,6 +21,7 @@ import { AssociateClients } from './AttorneyClients';
 import { AssociateMessages } from './AttorneyMessages';
 import { FaMoneyBillAlt } from 'react-icons/fa';
 import { Billing } from './AttorneyBilling';
+import { AttorneySettings } from '../attorney/AttorneySettings';
 
 interface AssociateLayoutProps {
   onLogout: () => void;
@@ -34,11 +35,11 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home },
     { id: 'cases', name: 'My Cases', icon: Briefcase },
+    { id: 'documents', name: 'Documents', icon: FileText },
     { id: 'clients', name: 'Clients', icon: Users },
-    { id: 'messages', name: 'Messages', icon: MessageSquare, badge: 3 },
     { id: 'notes', name: 'Notes', icon: CheckCircle },
     { id: 'billing', name: 'Billing', icon: FaMoneyBillAlt },
-    { id: 'documents', name: 'Documents', icon: FileText }
+    { id: 'settings', name: 'Settings', icon: Settings}
   ];
 
   const renderPage = () => {
@@ -57,6 +58,8 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
         return <AssociateDocuments />;
       case 'messages':
         return <AssociateMessages/>;
+      case 'settings':
+        return <AttorneySettings />;
       default:
         return <AssociateDashboard onNavigate={setCurrentPage} />;
     }
@@ -136,21 +139,6 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
                         }`}
                       />
                       <span className="flex-1 text-left">{item.name}</span>
-
-                      {item.badge && (
-                        <span
-                          className={`
-                            px-2 py-0.5 rounded-full text-xs font-semibold
-                            ${
-                              isActive
-                                ? 'bg-white/90 text-amber-600'
-                                : 'bg-amber-100 text-amber-700'
-                            }
-                          `}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
                     </button>
                   </li>
                 );

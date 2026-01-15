@@ -5,7 +5,6 @@ import { Button } from '../ui/Buttons';
 import {  
   Mail, 
   Phone,  
-  Briefcase, 
   Shield, 
   Calendar,
   Edit,
@@ -34,14 +33,6 @@ export function Profile() {
     // In a real app, this would save to backend
     setIsEditing(false);
   };
-
-  const activityLog = [
-    { id: 1, action: 'Logged in', timestamp: 'Jan 8, 2026 - 8:30 AM', ip: '192.168.1.105' },
-    { id: 2, action: 'Updated case CAS-2026-001', timestamp: 'Jan 8, 2026 - 10:45 AM', ip: '192.168.1.105' },
-    { id: 3, action: 'Uploaded document', timestamp: 'Jan 7, 2026 - 4:20 PM', ip: '192.168.1.105' },
-    { id: 4, action: 'Logged in', timestamp: 'Jan 7, 2026 - 8:15 AM', ip: '192.168.1.105' },
-    { id: 5, action: 'Password changed', timestamp: 'Jan 5, 2026 - 3:30 PM', ip: '192.168.1.105' }
-  ];
 
   return (
     <div className="p-8 space-y-6">
@@ -88,14 +79,6 @@ export function Profile() {
                 <div className="flex items-center gap-3 text-sm">
                   <Phone className="w-4 h-4 text-muted-foreground" />
                   <span className="text-foreground">{formData.phone}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Briefcase className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-foreground">{formData.department}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Shield className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-foreground">Bar #{formData.barNumber}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -202,15 +185,6 @@ export function Profile() {
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg opacity-60 cursor-not-allowed"
                   />
                 </div>
-                <div>
-                  <label className="block mb-2 text-foreground">Department</label>
-                  <input
-                    type="text"
-                    value={formData.department}
-                    disabled
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg opacity-60 cursor-not-allowed"
-                  />
-                </div>
               </div>
 
               {isEditing && (
@@ -223,59 +197,6 @@ export function Profile() {
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Office Address</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block mb-2 text-foreground">Street Address</label>
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    disabled={!isEditing}
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block mb-2 text-foreground">City</label>
-                    <input
-                      type="text"
-                      value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-2 text-foreground">State</label>
-                    <input
-                      type="text"
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-2 text-foreground">ZIP Code</label>
-                    <input
-                      type="text"
-                      value={formData.zipCode}
-                      onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -316,28 +237,6 @@ export function Profile() {
                   </div>
                 </div>
                 <Button variant="outline" size="sm">Configure</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {activityLog.map((activity) => (
-                  <div key={activity.id} className="px-6 py-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{activity.action}</p>
-                        <p className="text-xs text-muted-foreground">{activity.timestamp}</p>
-                      </div>
-                      <span className="text-xs text-muted-foreground font-mono">{activity.ip}</span>
-                    </div>
-                  </div>
-                ))}
               </div>
             </CardContent>
           </Card>

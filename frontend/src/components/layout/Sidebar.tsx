@@ -1,10 +1,7 @@
 import { 
   LayoutDashboard, 
-  Briefcase, 
-  Users,  
-  FileText, 
-  CreditCard,  
-  Settings 
+  Settings, 
+  Users
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -14,11 +11,8 @@ interface SidebarProps {
 
 const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'cases', label: 'Cases', icon: Briefcase },
-  { id: 'clients', label: 'Clients', icon: Users },
-  { id: 'documents', label: 'Documents', icon: FileText },
-  { id: 'billing', label: 'Billing & Payments', icon: CreditCard },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'users', label: 'Manage Users', icon: Users },
+  { id: 'companies', label: 'Manage Companies', icon: Settings },
 ];
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
