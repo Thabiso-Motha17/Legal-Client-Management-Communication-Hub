@@ -1,3 +1,7 @@
+-- Create the database and tables from your provided schema
+-- You'll need to run this in your PostgreSQL database first
+-- Or use a migration tool
+
 -- First, create law_firms table since users will reference it
 CREATE TABLE law_firms (
     id SERIAL PRIMARY KEY,
@@ -23,16 +27,10 @@ CREATE TABLE law_firms (
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_law_firms_name (name),
-    INDEX idx_law_firms_status (subscription_status),
-    INDEX idx_law_firms_plan (subscription_plan),
-    INDEX idx_law_firms_joined (joined_date)
+    last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- USERS TABLE - Updated with law_firm_id
+-- USERS TABLE
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -58,16 +56,10 @@ CREATE TABLE users (
         CHECK ((role IN ('admin', 'associate') AND law_firm_id IS NOT NULL) 
                OR role NOT IN ('admin', 'associate')),
     CONSTRAINT client_cannot_have_law_firm 
-        CHECK (role != 'client' OR law_firm_id IS NULL),
-    
-    -- Indexes
-    INDEX idx_users_role (role),
-    INDEX idx_users_law_firm (law_firm_id),
-    INDEX idx_users_is_active (is_active),
-    INDEX idx_users_created_at (created_at)
+        CHECK (role != 'client' OR law_firm_id IS NULL)
 );
 
--- CASES TABLE - Updated with law_firm_id
+-- CASES TABLE
 CREATE TABLE cases (
     id SERIAL PRIMARY KEY,
     file_number VARCHAR(50) UNIQUE NOT NULL,
@@ -92,24 +84,12 @@ CREATE TABLE cases (
     -- Description
     description TEXT,
     
-    -- Constraints
-    CONSTRAINT assigned_user_must_be_associate_or_admin 
-        CHECK (EXISTS (
-            SELECT 1 FROM users u 
-            WHERE u.id = assigned_to_user_id 
-            AND u.role IN ('associate', 'admin')
-        )),
-    
-    -- Indexes for performance
-    INDEX idx_case_status (status),
-    INDEX idx_case_priority (priority),
-    INDEX idx_case_law_firm (law_firm_id),
-    INDEX idx_assigned_to (assigned_to_user_id),
-    INDEX idx_date_opened (date_opened),
-    INDEX idx_deadline (deadline)
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- CLIENTS TABLE - Updated with law_firm_id
+-- CLIENTS TABLE
 CREATE TABLE clients (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -121,30 +101,16 @@ CREATE TABLE clients (
     
     -- Relationships
     assigned_associate_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    
     -- Dates
     joined_date DATE NOT NULL DEFAULT CURRENT_DATE,
     
     -- Constraints for business clients
     CONSTRAINT business_company_required 
-        CHECK (client_type != 'business' OR (client_type = 'business' AND company IS NOT NULL)),
-    
-    -- Check that assigned user is an associate
-    CONSTRAINT assigned_user_must_be_associate
-        CHECK (EXISTS (
-            SELECT 1 FROM users u 
-            WHERE u.id = assigned_associate_id 
-            AND u.role IN ('associate')
-        )),
-    
-    -- Indexes
-    INDEX idx_clients_assigned_associate (assigned_associate_id),
-    INDEX idx_clients_status (status),
-    INDEX idx_clients_type (client_type),
-    INDEX idx_clients_email (email),
-    INDEX idx_clients_joined_date (joined_date)
+        CHECK (client_type != 'business' OR (client_type = 'business' AND company IS NOT NULL))
 );
 
--- DOCUMENTS TABLE - Updated with law_firm_id
+-- DOCUMENTS TABLE
 CREATE TABLE documents (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -171,18 +137,10 @@ CREATE TABLE documents (
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reviewed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_documents_law_firm (law_firm_id),
-    INDEX idx_documents_case (case_id),
-    INDEX idx_documents_uploaded_by (uploaded_by_user_id),
-    INDEX idx_documents_status (status),
-    INDEX idx_documents_type (document_type),
-    INDEX idx_documents_uploaded_at (uploaded_at)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- NOTES TABLE - Updated with law_firm_id
+-- NOTES TABLE
 CREATE TABLE notes (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -209,16 +167,41 @@ CREATE TABLE notes (
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes
-    INDEX idx_notes_user (user_id),
-    INDEX idx_notes_case (case_id),
-    INDEX idx_notes_pinned (is_pinned),
-    INDEX idx_notes_archived (is_archived),
-    INDEX idx_notes_category (category),
-    INDEX idx_notes_created_at (created_at)
+    last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add indexes for better performance
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_law_firm ON users(law_firm_id);
+CREATE INDEX idx_users_is_active ON users(is_active);
+CREATE INDEX idx_users_created_at ON users(created_at);
+
+CREATE INDEX idx_case_status ON cases(status);
+CREATE INDEX idx_case_priority ON cases(priority);
+CREATE INDEX idx_case_law_firm ON cases(law_firm_id);
+CREATE INDEX idx_assigned_to ON cases(assigned_to_user_id);
+CREATE INDEX idx_date_opened ON cases(date_opened);
+CREATE INDEX idx_deadline ON cases(deadline);
+
+CREATE INDEX idx_clients_assigned_associate ON clients(assigned_associate_id);
+CREATE INDEX idx_clients_status ON clients(status);
+CREATE INDEX idx_clients_type ON clients(client_type);
+CREATE INDEX idx_clients_email ON clients(email);
+CREATE INDEX idx_clients_joined_date ON clients(joined_date);
+
+CREATE INDEX idx_documents_law_firm ON documents(law_firm_id);
+CREATE INDEX idx_documents_case ON documents(case_id);
+CREATE INDEX idx_documents_uploaded_by ON documents(uploaded_by_user_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_type ON documents(document_type);
+CREATE INDEX idx_documents_uploaded_at ON documents(uploaded_at);
+
+CREATE INDEX idx_notes_user ON notes(user_id);
+CREATE INDEX idx_notes_case ON notes(case_id);
+CREATE INDEX idx_notes_pinned ON notes(is_pinned);
+CREATE INDEX idx_notes_archived ON notes(is_archived);
+CREATE INDEX idx_notes_category ON notes(category);
+CREATE INDEX idx_notes_created_at ON notes(created_at);
 
 -- Create a trigger to update member_count in law_firms when users are added/removed
 CREATE OR REPLACE FUNCTION update_law_firm_member_count()
@@ -305,3 +288,12 @@ EXECUTE FUNCTION update_law_firm_last_active();
 CREATE TRIGGER cases_last_active_trigger
 AFTER INSERT OR UPDATE ON cases
 FOR EACH ROW EXECUTE FUNCTION update_law_firm_last_active();
+
+-- Insert sample data (optional)
+INSERT INTO law_firms (name, email, phone, city, country) 
+VALUES ('Legal Eagles LLP', 'contact@legaleagles.com', '+1234567890', 'New York', 'USA');
+
+INSERT INTO users (username, email, password_hash, full_name, role, law_firm_id) 
+VALUES 
+('admin1', 'admin@legaleagles.com', '$2a$10$YourHashedPasswordHere', 'John Doe', 'admin', 1),
+('associate1', 'lawyer@legaleagles.com', '$2a$10$YourHashedPasswordHere', 'Jane Smith', 'associate', 1);
