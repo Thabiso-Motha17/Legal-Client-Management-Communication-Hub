@@ -1,4 +1,4 @@
-import { useState, useRef, type ChangeEvent } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
@@ -7,7 +7,6 @@ import {
   Download, 
   Search,
   Filter,
-  Eye,
   Calendar,
   File,
   Upload,
@@ -15,171 +14,136 @@ import {
   User,
   AlertCircle,
   CheckCircle,
-  Trash2
+  Trash2,
+  Loader2,
+  Briefcase
 } from 'lucide-react';
+import { documentService, caseService, authService } from '../services/api';
+import type{ Document, Case, User as UserType } from '../../types/Types';
+
+interface DocumentWithMetadata extends Omit<Document, 'client_name'> {
+  client_name?: string;
+  isClientUpload?: boolean;
+}
 
 export function ClientDocuments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [uploadedByFilter, setUploadedByFilter] = useState('all');
-  const [clientDocuments, setClientDocuments] = useState([
-    {
-      id: 101,
-      name: 'Bank Statement - Jan 2026.pdf',
-      category: 'Financial',
-      uploadDate: 'Jan 12, 2026',
-      size: '1.2 MB',
-      uploadedBy: 'You',
-      status: 'Uploaded',
-      description: 'Bank statement for account verification'
-    },
-    {
-      id: 102,
-      name: 'Property Photos.zip',
-      category: 'Evidence',
-      uploadDate: 'Jan 9, 2026',
-      size: '4.5 MB',
-      uploadedBy: 'You',
-      status: 'Reviewed',
-      description: 'Photos of property for estate planning'
-    },
-    {
-      id: 103,
-      name: 'ID Document.jpg',
-      category: 'Identification',
-      uploadDate: 'Dec 22, 2025',
-      size: '850 KB',
-      uploadedBy: 'You',
-      status: 'Verified',
-      description: 'Scanned copy of identification'
-    }
-  ]);
+  const [documents, setDocuments] = useState<DocumentWithMetadata[]>([]);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
   const [newDocument, setNewDocument] = useState({
     name: '',
-    category: 'Financial',
-    description: ''
+    case_id: 0,
+    document_type: 'Receipt',
+    description: '',
+    file: null as File | null
   });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const attorneyDocuments = [
-    {
-      id: 1,
-      name: 'Trust Agreement - Draft v2.pdf',
-      category: 'Agreements',
-      uploadDate: 'Jan 10, 2026',
-      size: '2.4 MB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Review Required'
-    },
-    {
-      id: 2,
-      name: 'Property Deed Transfer.pdf',
-      category: 'Legal Documents',
-      uploadDate: 'Jan 8, 2026',
-      size: '1.8 MB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Completed'
-    },
-    {
-      id: 3,
-      name: 'Will - Final Version.pdf',
-      category: 'Wills',
-      uploadDate: 'Jan 5, 2026',
-      size: '856 KB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Signed'
-    },
-    {
-      id: 4,
-      name: 'Asset Inventory.xlsx',
-      category: 'Financial',
-      uploadDate: 'Dec 28, 2025',
-      size: '124 KB',
-      uploadedBy: 'John Johnson',
-      status: 'Completed'
-    },
-    {
-      id: 5,
-      name: 'Healthcare Directive.pdf',
-      category: 'Legal Documents',
-      uploadDate: 'Dec 20, 2025',
-      size: '675 KB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Signed'
-    },
-    {
-      id: 6,
-      name: 'Power of Attorney - Financial.pdf',
-      category: 'Legal Documents',
-      uploadDate: 'Dec 18, 2025',
-      size: '892 KB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Signed'
-    },
-    {
-      id: 7,
-      name: 'Trust Agreement - Draft v1.pdf',
-      category: 'Agreements',
-      uploadDate: 'Dec 15, 2025',
-      size: '2.2 MB',
-      uploadedBy: 'Sarah Mitchell',
-      status: 'Superseded'
-    },
-    {
-      id: 8,
-      name: 'Estate Planning Questionnaire.pdf',
-      category: 'Forms',
-      uploadDate: 'Nov 20, 2025',
-      size: '458 KB',
-      uploadedBy: 'John Johnson',
-      status: 'Completed'
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      const meData = await authService.getMe();
+      if (meData?.user) {
+        setCurrentUser(meData.user);
+      }
+
+      // Get client's cases
+      const casesData = await caseService.getAll();
+      setCases(casesData);
+
+      // Get client's documents
+      const docsData = await documentService.getMyDocuments();
+      
+      // Add metadata for client/attorney identification
+      const docsWithMetadata = docsData.map(doc => ({
+        ...doc,
+        isClientUpload: doc.uploaded_by_user_id === currentUser?.id
+      }));
+      
+      setDocuments(docsWithMetadata);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load documents');
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const categories = ['all', 'Receipt', 'Letter', 'Pleadings', 'Correspondences'];
-
-  const allDocuments = [...attorneyDocuments, ...clientDocuments];
-
-  const filteredDocuments = allDocuments.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) 
-                         
-    const matchesCategory = filterCategory === 'all' || doc.category === filterCategory;
-    const matchesUploader = uploadedByFilter === 'all' || 
-                           (uploadedByFilter === 'attorney' && doc.uploadedBy !== 'You') ||
-                           (uploadedByFilter === 'client' && doc.uploadedBy === 'You');
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.document_type.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = filterCategory === 'all' || doc.document_type === filterCategory;
+    
+    const matchesUploader = 
+      uploadedByFilter === 'all' ||
+      (uploadedByFilter === 'client' && doc.isClientUpload) ||
+      (uploadedByFilter === 'attorney' && !doc.isClientUpload);
+    
     return matchesSearch && matchesCategory && matchesUploader;
   });
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Review Required':
-      case 'Uploaded':
+      case 'Draft':
+      case 'Under Review':
         return 'warning';
-      case 'Signed':
-      case 'Completed':
-      case 'Verified':
-      case 'Reviewed':
+      case 'Approved':
+      case 'Reference':
         return 'success';
-      case 'Superseded':
-        return 'secondary';
+      case 'Rejected':
+        return 'error';
       default:
         return 'default';
     }
   };
 
-  const getFileIcon = (filename: string) => {
-    if (filename.endsWith('.pdf')) {
-      return <FileText className="w-5 h-5 text-destructive" />;
-    } else if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) {
-      return <File className="w-5 h-5 text-success" />;
-    } else if (filename.endsWith('.zip')) {
-      return <File className="w-5 h-5 text-warning" />;
-    } else if (filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.png')) {
-      return <File className="w-5 h-5 text-primary" />;
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'Draft': return 'Draft';
+      case 'Under Review': return 'Under Review';
+      case 'Approved': return 'Approved';
+      case 'Rejected': return 'Rejected';
+      case 'Reference': return 'Reference';
+      default: return status;
+    }
+  };
+
+  const getFileIcon = (filename: string, mimeType?: string | null) => {
+    if (filename.endsWith('.pdf') || mimeType?.includes('pdf')) {
+      return <FileText className="w-5 h-5 text-red-500" />;
+    } else if (filename.endsWith('.xlsx') || filename.endsWith('.xls') || mimeType?.includes('spreadsheet')) {
+      return <File className="w-5 h-5 text-green-500" />;
+    } else if (filename.endsWith('.zip') || mimeType?.includes('zip')) {
+      return <File className="w-5 h-5 text-yellow-500" />;
+    } else if (
+      filename.endsWith('.jpg') || 
+      filename.endsWith('.jpeg') || 
+      filename.endsWith('.png') ||
+      mimeType?.includes('image')
+    ) {
+      return <File className="w-5 h-5 text-blue-500" />;
+    } else if (filename.endsWith('.doc') || filename.endsWith('.docx') || mimeType?.includes('word')) {
+      return <FileText className="w-5 h-5 text-blue-600" />;
     } else {
-      return <FileText className="w-5 h-5 text-primary" />;
+      return <FileText className="w-5 h-5 text-gray-500" />;
     }
   };
 
@@ -187,10 +151,25 @@ export function ClientDocuments() {
     const file = event.target.files?.[0];
     if (file) {
       // Validate file type
-      const validTypes = ['.pdf', '.jpg', '.jpeg', '.png', '.xlsx', '.xls', '.doc', '.docx', '.zip'];
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      const validTypes = [
+        '.pdf', '.jpg', '.jpeg', '.png', 
+        '.xlsx', '.xls', '.doc', '.docx', '.zip',
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/zip'
+      ];
       
-      if (!validTypes.includes(fileExtension)) {
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      const isValidType = validTypes.includes(fileExtension) || 
+                         validTypes.includes(file.type) ||
+                         file.type.startsWith('image/');
+      
+      if (!isValidType) {
         alert('Please select a valid file type (PDF, images, documents, or ZIP)');
         return;
       }
@@ -201,11 +180,11 @@ export function ClientDocuments() {
         return;
       }
 
-      setSelectedFile(file);
       setNewDocument({
         ...newDocument,
+        file,
         name: file.name,
-        category: getCategoryFromFile(file)
+        document_type: getCategoryFromFile(file)
       });
     }
   };
@@ -215,49 +194,72 @@ export function ClientDocuments() {
     if (name.includes('bank') || name.includes('statement') || name.includes('financial')) return 'Financial';
     if (name.includes('id') || name.includes('passport') || name.includes('license')) return 'Identification';
     if (name.includes('photo') || name.includes('image') || name.includes('evidence')) return 'Evidence';
-    if (name.endsWith('.pdf')) return 'Legal Documents';
-    return 'Financial';
+    if (name.includes('receipt')) return 'Receipt';
+    if (name.includes('letter')) return 'Letter';
+    if (name.includes('pleading')) return 'Pleadings';
+    if (name.includes('correspondence')) return 'Correspondences';
+    if (file.type.includes('pdf')) return 'Legal Documents';
+    return 'Other';
   };
 
-  const handleUpload = () => {
-    if (!selectedFile) {
+  const handleUpload = async () => {
+    if (!newDocument.file) {
       alert('Please select a file to upload');
       return;
     }
 
-    if (!newDocument.description.trim()) {
-      alert('Please add a description for the document');
+    if (!newDocument.case_id) {
+      alert('Please select a case for this document');
       return;
     }
 
-    setUploading(true);
+    if (!newDocument.name.trim()) {
+      alert('Please enter a document name');
+      return;
+    }
 
-    // Simulate upload process
-    setTimeout(() => {
-      const newDoc = {
-        id: Date.now(),
-        name: selectedFile.name,
-        category: newDocument.category,
-        uploadDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-        size: formatFileSize(selectedFile.size),
-        uploadedBy: 'You',
-        status: 'Uploaded',
-        description: newDocument.description
-      };
+    try {
+      setUploading(true);
 
-      setClientDocuments(prev => [newDoc, ...prev]);
-      setUploading(false);
-      setSelectedFile(null);
-      setNewDocument({
-        name: '',
-        category: 'Financial',
-        description: ''
-      });
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('name', newDocument.name);
+      formData.append('case_id', newDocument.case_id.toString());
+      formData.append('document_type', newDocument.document_type);
+      formData.append('description', newDocument.description);
+      formData.append('file', newDocument.file);
+      formData.append('version', '1');
+      formData.append('status', 'Draft');
+
+      // Upload document
+      const uploadedDoc = await documentService.uploadDocument(formData);
       
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+      if (uploadedDoc) {
+        // Refresh documents list
+        await fetchData();
+        
+        // Reset form
+        setNewDocument({
+          name: '',
+          case_id: 0,
+          document_type: 'Receipt',
+          description: '',
+          file: null
+        });
+        
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        
+        alert('Document uploaded successfully!');
+      } else {
+        alert('Failed to upload document');
       }
-    }, 1500);
+    } catch (err: any) {
+      alert(`Error uploading document: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -266,25 +268,103 @@ export function ClientDocuments() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const handleDeleteDocument = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this document?')) {
-      setClientDocuments(prev => prev.filter(doc => doc.id !== id));
+  const handleDeleteDocument = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this document?')) {
+      return;
+    }
+
+    try {
+      const success = await documentService.deleteDocument(id);
+      if (success) {
+        // Remove document from state
+        setDocuments(prev => prev.filter(doc => doc.id !== id));
+        alert('Document deleted successfully');
+      } else {
+        alert('Failed to delete document');
+      }
+    } catch (err: any) {
+      alert(`Error deleting document: ${err.message}`);
+    }
+  };
+
+  const handleDownloadDocument = async (id: number, name: string) => {
+    try {
+      await documentService.downloadDocument(id);
+    } catch (err: any) {
+      alert(`Error downloading document: ${err.message}`);
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Uploaded':
-        return <AlertCircle className="w-3 h-3 text-warning" />;
-      case 'Verified':
-      case 'Reviewed':
-      case 'Signed':
-      case 'Completed':
-        return <CheckCircle className="w-3 h-3 text-success" />;
+      case 'Draft':
+      case 'Under Review':
+        return <AlertCircle className="w-3 h-3 text-yellow-500" />;
+      case 'Approved':
+      case 'Reference':
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+      case 'Rejected':
+        return <X className="w-3 h-3 text-red-500" />;
       default:
         return null;
     }
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Calculate statistics
+  const clientDocuments = documents.filter(doc => doc.isClientUpload);
+  const attorneyDocuments = documents.filter(doc => !doc.isClientUpload);
+  
+  const stats = {
+    totalDocuments: documents.length,
+    clientUploads: clientDocuments.length,
+    pendingReview: documents.filter(d => d.status === 'Draft' || d.status === 'Under Review').length,
+    approvedDocuments: documents.filter(d => d.status === 'Approved' || d.status === 'Reference').length,
+    totalSize: documents.reduce((sum, doc) => sum + (doc.file_size || 0), 0)
+  };
+
+  const categories = ['all', 'Receipt', 'Letter', 'Pleadings', 'Correspondences', 'Financial', 'Identification', 'Evidence', 'Legal Documents', 'Other'];
+
+  if (loading && !uploading) {
+    return (
+      <div className="p-6 md:p-8 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-muted-foreground">Loading documents...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 md:p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <h2 className="text-lg font-semibold text-red-800">Error Loading Documents</h2>
+          </div>
+          <p className="text-red-700 mb-4">{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={fetchData}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -299,35 +379,33 @@ export function ClientDocuments() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground mb-1">Total Documents</p>
-            <p className="text-2xl font-semibold text-foreground">{allDocuments.length}</p>
+            <p className="text-2xl font-semibold text-foreground">{stats.totalDocuments}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground mb-1">Your Uploads</p>
-            <p className="text-2xl font-semibold text-primary">{clientDocuments.length}</p>
+            <p className="text-2xl font-semibold text-primary">{stats.clientUploads}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground mb-1">Pending Review</p>
-            <p className="text-2xl font-semibold text-warning">
-              {allDocuments.filter(d => d.status === 'Review Required' || d.status === 'Uploaded').length}
-            </p>
+            <p className="text-2xl font-semibold text-warning">{stats.pendingReview}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground mb-1">Verified/Signed</p>
-            <p className="text-2xl font-semibold text-success">
-              {allDocuments.filter(d => d.status === 'Signed' || d.status === 'Verified' || d.status === 'Reviewed').length}
-            </p>
+            <p className="text-sm text-muted-foreground mb-1">Approved</p>
+            <p className="text-2xl font-semibold text-success">{stats.approvedDocuments}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground mb-1">Total Size</p>
-            <p className="text-2xl font-semibold text-foreground">~15.5 MB</p>
+            <p className="text-2xl font-semibold text-foreground">
+              {formatFileSize(stats.totalSize)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -341,7 +419,7 @@ export function ClientDocuments() {
             </div>
             <div>
               <h3 className="text-foreground font-medium mb-1">Upload New Document</h3>
-              <p className="text-sm text-muted-foreground">Upload files for your attorney to review (PDF)</p>
+              <p className="text-sm text-muted-foreground">Upload files for your attorney to review</p>
             </div>
           </div>
 
@@ -353,24 +431,24 @@ export function ClientDocuments() {
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept=".pdf"
+                accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx,.zip"
                 className="hidden"
               />
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-muted/30 transition-colors"
               >
-                {selectedFile ? (
+                {newDocument.file ? (
                   <div className="space-y-2">
-                    <FileText className="w-8 h-8 text-primary mx-auto" />
-                    <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
+                    {getFileIcon(newDocument.file.name, newDocument.file.type)}
+                    <p className="text-sm font-medium text-foreground truncate">{newDocument.file.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file.size)}</p>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e:any) => {
+                      onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedFile(null);
+                        setNewDocument({ ...newDocument, file: null });
                         if (fileInputRef.current) fileInputRef.current.value = '';
                       }}
                       className="mt-2"
@@ -382,7 +460,7 @@ export function ClientDocuments() {
                   <>
                     <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-sm font-medium text-foreground mb-1">Click to select file</p>
-                    <p className="text-xs text-muted-foreground">Max 10MB • PDF Only</p>
+                    <p className="text-xs text-muted-foreground">Max 10MB • PDF, Images, Documents, ZIP</p>
                   </>
                 )}
               </div>
@@ -391,10 +469,27 @@ export function ClientDocuments() {
             {/* Document Details */}
             <div className="space-y-4">
               <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Case *</label>
+                <select
+                  value={newDocument.case_id}
+                  onChange={(e) => setNewDocument({...newDocument, case_id: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  required
+                >
+                  <option value="0">Select a case...</option>
+                  {cases.map(caseItem => (
+                    <option key={caseItem.id} value={caseItem.id}>
+                      {caseItem.case_number} - {caseItem.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">Category</label>
                 <select
-                  value={newDocument.category}
-                  onChange={(e) => setNewDocument({...newDocument, category: e.target.value})}
+                  value={newDocument.document_type}
+                  onChange={(e) => setNewDocument({...newDocument, document_type: e.target.value})}
                   className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {categories.filter(c => c !== 'all').map(category => (
@@ -420,12 +515,12 @@ export function ClientDocuments() {
               <Button
                 variant="primary"
                 onClick={handleUpload}
-                disabled={!selectedFile || uploading}
+                disabled={!newDocument.file || !newDocument.case_id || uploading}
                 className="w-full gap-2"
               >
                 {uploading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Uploading...
                   </>
                 ) : (
@@ -502,7 +597,9 @@ export function ClientDocuments() {
           {filteredDocuments.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No documents found</p>
+              <p className="text-muted-foreground">
+                {documents.length === 0 ? 'No documents found' : 'No documents match your filters'}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -511,7 +608,7 @@ export function ClientDocuments() {
                   <div className="flex items-start gap-4">
                     {/* File Icon */}
                     <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-1">
-                      {getFileIcon(doc.name)}
+                      {getFileIcon(doc.file_name, doc.mime_type)}
                     </div>
 
                     {/* Document Info */}
@@ -521,48 +618,55 @@ export function ClientDocuments() {
                           <h3 className="text-sm font-medium text-foreground truncate">{doc.name}</h3>
                           <Badge variant={getStatusVariant(doc.status)} className="flex-shrink-0 gap-1">
                             {getStatusIcon(doc.status)}
-                            {doc.status}
+                            {getStatusDisplay(doc.status)}
                           </Badge>
                         </div>
                         <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
-                          doc.uploadedBy === 'You' 
+                          doc.isClientUpload 
                             ? 'bg-primary/10 text-primary' 
                             : 'bg-secondary/10 text-secondary'
                         }`}>
-                          {doc.uploadedBy === 'You' ? <User className="w-3 h-3" /> : null}
-                          {doc.uploadedBy}
+                          {doc.isClientUpload ? <User className="w-3 h-3" /> : <Briefcase className="w-3 h-3" />}
+                          {doc.isClientUpload ? 'You' : 'Attorney'}
                         </span>
                       </div>
                       
-                      {(doc as any).description && (
-                        <p className="text-sm text-muted-foreground mb-2">{(doc as any).description}</p>
+                      {doc.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{doc.description}</p>
                       )}
                       
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {doc.uploadDate}
+                          {formatDate(doc.uploaded_at)}
                         </span>
-                        <span>{doc.size}</span>
-                        <span>{doc.category}</span>
-                        {doc.uploadedBy !== 'You' && <span>Uploaded by {doc.uploadedBy}</span>}
+                        <span>{formatFileSize(doc.file_size || 0)}</span>
+                        <span>{doc.document_type}</span>
+                        {doc.case_title && (
+                          <span className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            {doc.case_title}
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Eye className="w-4 h-4" />
-                        View
-                      </Button>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => handleDownloadDocument(doc.id, doc.name)}
+                      >
                         <Download className="w-4 h-4" />
+                        Download
                       </Button>
-                      {doc.uploadedBy === 'You' && (
+                      {doc.isClientUpload && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => handleDeleteDocument(doc.id)}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -595,13 +699,13 @@ export function ClientDocuments() {
               <div className="bg-warning/5 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground mb-1">Awaiting Review</p>
                 <p className="text-2xl font-semibold text-warning">
-                  {clientDocuments.filter(d => d.status === 'Uploaded').length}
+                  {clientDocuments.filter(d => d.status === 'Draft' || d.status === 'Under Review').length}
                 </p>
               </div>
-              <div className="bg-success/5 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-1">Reviewed/Verified</p>
-                <p className="text-2xl font-semibold text-success">
-                  {clientDocuments.filter(d => d.status === 'Reviewed' || d.status === 'Verified').length}
+              <div className="bg-green-500/5 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-1">Approved</p>
+                <p className="text-2xl font-semibold text-green-600">
+                  {clientDocuments.filter(d => d.status === 'Approved' || d.status === 'Reference').length}
                 </p>
               </div>
             </div>
@@ -634,12 +738,12 @@ export function ClientDocuments() {
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-secondary" />
+                    <Briefcase className="w-4 h-4 text-secondary" />
                     Attorney Documents
                   </h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Documents from your attorney are read-only</li>
-                    <li>• "Review Required" means your attention is needed</li>
+                    <li>• "Under Review" means your attention is needed</li>
                     <li>• Download any document for your records</li>
                     <li>• Contact your attorney with questions</li>
                     <li>• All documents are securely encrypted</li>

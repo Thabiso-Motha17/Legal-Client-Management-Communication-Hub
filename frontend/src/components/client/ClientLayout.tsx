@@ -14,7 +14,6 @@ import {
 import { ClientDashboard } from './ClientDashboard';
 import { ClientCases } from './ClientCase';
 import { ClientDocuments } from './ClientDocuments';
-import { ClientMessages } from './ClientMessages';
 import { ClientBilling } from './ClientBilling';
 
 interface ClientLayoutProps {
@@ -41,8 +40,6 @@ export function ClientLayout({ onLogout }: ClientLayoutProps) {
         return <ClientCases />;
       case 'documents':
         return <ClientDocuments />;
-      case 'messages':
-        return <ClientMessages />;
       case 'billing':
         return <ClientBilling />;
       default:

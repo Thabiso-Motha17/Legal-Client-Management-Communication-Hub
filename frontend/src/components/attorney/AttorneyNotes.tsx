@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
@@ -17,148 +17,61 @@ import {
   Tag,
   Calendar,
   FileText,
-  BookOpen,
   Filter
 } from 'lucide-react';
-
-interface Note {
-  id: number;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  lastAccessed: string;
-  wordCount: number;
-  isPinned: boolean;
-  isArchived: boolean;
-}
+import type{ Note, CreateNoteData, UpdateNoteData, Case } from '../../types/Types';
+import { apiRequest } from '../lib/api';
 
 export function AssociateNotes() {
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: 1,
-      title: 'Client Meeting Notes - Johnson Estate',
-      content: 'Discussed trust amendments. Client wants to add grandchildren as beneficiaries. Need to review tax implications.\n\nAction Items:\n1. Draft amendment by Friday\n2. Schedule follow-up meeting\n3. Research estate tax thresholds',
-      category: 'Client Meetings',
-      tags: ['estate-planning', 'client', 'urgent'],
-      createdAt: '2026-01-10',
-      updatedAt: '2026-01-12',
-      lastAccessed: '2026-01-13',
-      wordCount: 85,
-      isPinned: true,
-      isArchived: false
-    },
-    {
-      id: 2,
-      title: 'Merger Agreement Research',
-      content: 'Key points from merger agreement review:\n- Section 4.2 needs clarification on indemnification\n- Non-compete clauses are too broad\n- Need to negotiate termination clauses',
-      category: 'Research',
-      tags: ['corporate', 'merger', 'contract-review'],
-      createdAt: '2026-01-08',
-      updatedAt: '2026-01-09',
-      lastAccessed: '2026-01-12',
-      wordCount: 45,
-      isPinned: true,
-      isArchived: false
-    },
-    {
-      id: 3,
-      title: 'Legal Research - Data Privacy Laws',
-      content: 'Summary of GDPR requirements:\n- Data minimization principle\n- Right to be forgotten\n- Cross-border data transfer restrictions\n\nApplicability to client\'s EU operations',
-      category: 'Legal Research',
-      tags: ['privacy', 'gdpr', 'international'],
-      createdAt: '2026-01-05',
-      updatedAt: '2026-01-07',
-      lastAccessed: '2026-01-10',
-      wordCount: 120,
-      isPinned: false,
-      isArchived: false
-    },
-    {
-      id: 4,
-      title: 'Case Strategy - Smith Contract',
-      content: 'Initial strategy for contract dispute:\n1. Gather all communications\n2. Review termination clauses\n3. Assess damages\n4. Consider mediation vs litigation',
-      category: 'Case Strategy',
-      tags: ['dispute', 'strategy', 'contract'],
-      createdAt: '2026-01-03',
-      updatedAt: '2026-01-04',
-      lastAccessed: '2026-01-09',
-      wordCount: 65,
-      isPinned: false,
-      isArchived: false
-    },
-    {
-      id: 5,
-      title: 'Conference Takeaways',
-      content: 'Key insights from LegalTech Conference 2026:\n- AI contract review tools maturing\n- Blockchain for smart contracts\n- New e-discovery best practices',
-      category: 'Professional Development',
-      tags: ['conference', 'tech', 'learning'],
-      createdAt: '2025-12-15',
-      updatedAt: '2025-12-20',
-      lastAccessed: '2026-01-08',
-      wordCount: 55,
-      isPinned: false,
-      isArchived: false
-    },
-    {
-      id: 6,
-      title: 'Template Library Ideas',
-      content: 'Common templates needed:\n1. NDA agreements\n2. Engagement letters\n3. Settlement agreements\n4. Client intake forms',
-      category: 'Templates',
-      tags: ['templates', 'organization', 'efficiency'],
-      createdAt: '2025-12-10',
-      updatedAt: '2025-12-12',
-      lastAccessed: '2026-01-05',
-      wordCount: 40,
-      isPinned: false,
-      isArchived: false
-    },
-    {
-      id: 7,
-      title: 'Deposition Preparation',
-      content: 'Questions for witness:\n1. Timeline of events\n2. Communication records\n3. Decision-making process\n4. Knowledge of agreements',
-      category: 'Litigation',
-      tags: ['deposition', 'preparation', 'witness'],
-      createdAt: '2025-12-08',
-      updatedAt: '2025-12-08',
-      lastAccessed: '2026-01-04',
-      wordCount: 75,
-      isPinned: false,
-      isArchived: false
-    },
-    {
-      id: 8,
-      title: 'Old Meeting Notes',
-      content: 'Archived meeting notes from Q4 2025',
-      category: 'Archived',
-      tags: ['old', 'meeting'],
-      createdAt: '2025-10-15',
-      updatedAt: '2025-10-15',
-      lastAccessed: '2025-12-30',
-      wordCount: 20,
-      isPinned: false,
-      isArchived: true
-    }
-  ]);
-
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [cases, setCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedTag, setSelectedTag] = useState('all');
   const [showArchived, setShowArchived] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [newNote, setNewNote] = useState({
+  
+  const [newNote, setNewNote] = useState<CreateNoteData>({
     title: '',
     content: '',
-    category: '',
-    tags: [] as string[]
+    category: 'Uncategorized',
+    tags: [],
+    is_private: false,
+    case_id: undefined
   });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch notes for the current user
+      const notesResponse = await apiRequest<Note[]>(`/api/notes`);
+      if (notesResponse.data) {
+        setNotes(notesResponse.data);
+      }
+      
+      // Fetch cases for the current user
+      const casesResponse = await apiRequest<Case[]>(`/api/cases`);
+      if (casesResponse.data) {
+        setCases(casesResponse.data);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Get all unique categories and tags
   const categories = ['all', ...Array.from(new Set(notes.map(note => note.category)))];
-  const allTags = notes.flatMap(note => note.tags);
+  const allTags = notes.flatMap(note => note.tags || []);
   const uniqueTags = ['all', ...Array.from(new Set(allTags))];
 
   // Filter notes
@@ -168,21 +81,21 @@ export function AssociateNotes() {
       note.content.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesCategory = selectedCategory === 'all' || note.category === selectedCategory;
-    const matchesTag = selectedTag === 'all' || note.tags.includes(selectedTag);
-    const matchesArchived = showArchived ? true : !note.isArchived;
+    const matchesTag = selectedTag === 'all' || (note.tags && note.tags.includes(selectedTag));
+    const matchesArchived = showArchived ? true : !note.is_archived;
     
     return matchesSearch && matchesCategory && matchesTag && matchesArchived;
   });
 
-  const pinnedNotes = filteredNotes.filter(note => note.isPinned && !note.isArchived);
-  const otherNotes = filteredNotes.filter(note => !note.isPinned && !note.isArchived);
-  const archivedNotes = filteredNotes.filter(note => note.isArchived);
+  const pinnedNotes = filteredNotes.filter(note => note.is_pinned && !note.is_archived);
+  const otherNotes = filteredNotes.filter(note => !note.is_pinned && !note.is_archived);
+  const archivedNotes = filteredNotes.filter(note => note.is_archived);
 
   // Note statistics
   const noteStats = {
-    total: notes.filter(n => !n.isArchived).length,
-    pinned: notes.filter(n => n.isPinned && !n.isArchived).length,
-    archived: notes.filter(n => n.isArchived).length,
+    total: notes.filter(n => !n.is_archived).length,
+    pinned: notes.filter(n => n.is_pinned && !n.is_archived).length,
+    archived: notes.filter(n => n.is_archived).length,
     byCategory: Object.entries(
       notes.reduce((acc, note) => {
         acc[note.category] = (acc[note.category] || 0) + 1;
@@ -192,26 +105,47 @@ export function AssociateNotes() {
   };
 
   // Note actions
-  const handleCreateNote = () => {
-    if (!newNote.title.trim() || !newNote.content.trim()) return;
-    
-    const note: Note = {
-      id: notes.length + 1,
-      title: newNote.title,
-      content: newNote.content,
-      category: newNote.category || 'Uncategorized',
-      tags: newNote.tags,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0],
-      lastAccessed: new Date().toISOString().split('T')[0],
-      wordCount: newNote.content.split(/\s+/).length,
-      isPinned: false,
-      isArchived: false
-    };
-    
-    setNotes([note, ...notes]);
-    setNewNote({ title: '', content: '', category: '', tags: [] });
-    setIsEditing(false);
+  const handleCreateNote = async () => {
+    if (!newNote.title.trim() || !newNote.content.trim()) {
+      alert('Please fill in title and content');
+      return;
+    }
+
+    try {
+      const noteData: CreateNoteData = {
+        title: newNote.title,
+        content: newNote.content,
+        category: newNote.category || 'Uncategorized',
+        tags: newNote.tags || [],
+        is_private: newNote.is_private,
+        case_id: newNote.case_id
+        // law_firm_id is NOT included - backend gets it from the authenticated user
+      };
+
+      const response = await apiRequest<Note>(`/api/notes`, {
+        method: 'POST',
+        body: JSON.stringify(noteData),
+      });
+
+      if (response.data) {
+        setNotes([response.data, ...notes]);
+        setNewNote({
+          title: '',
+          content: '',
+          category: 'Uncategorized',
+          tags: [],
+          is_private: false,
+          case_id: undefined
+        });
+        setIsEditing(false);
+        fetchData(); // Refresh data
+      } else if (response.error) {
+        alert(`Error creating note: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('Error creating note:', error);
+      alert('Failed to create note. Please try again.');
+    }
   };
 
   const handleEditNote = (note: Note) => {
@@ -219,56 +153,137 @@ export function AssociateNotes() {
     setIsEditing(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingNote) return;
     
-    setNotes(notes.map(note => 
-      note.id === editingNote.id 
-        ? { 
-            ...editingNote, 
-            updatedAt: new Date().toISOString().split('T')[0],
-            wordCount: editingNote.content.split(/\s+/).length
-          }
-        : note
-    ));
-    
-    setEditingNote(null);
-    setIsEditing(false);
-  };
+    try {
+      const updateData: UpdateNoteData = {
+        title: editingNote.title,
+        content: editingNote.content,
+        category: editingNote.category,
+        tags: editingNote.tags || [],
+        is_pinned: editingNote.is_pinned,
+        is_archived: editingNote.is_archived,
+        is_private: editingNote.is_private
+        // law_firm_id is NOT included in updates either
+      };
 
-  const handleDeleteNote = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      setNotes(notes.filter(note => note.id !== id));
+      const response = await apiRequest<Note>(`/api/notes/${editingNote.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.data) {
+        setNotes(notes.map(note => 
+          note.id === editingNote.id ? response.data! : note
+        ));
+        setEditingNote(null);
+        setIsEditing(false);
+        fetchData(); // Refresh data
+      } else if (response.error) {
+        alert(`Error updating note: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating note:', error);
+      alert('Failed to update note. Please try again.');
     }
   };
 
-  const handleTogglePin = (id: number) => {
-    setNotes(notes.map(note => 
-      note.id === id ? { ...note, isPinned: !note.isPinned } : note
-    ));
-  };
+  const handleDeleteNote = async (id: number) => {
+  if (window.confirm('Are you sure you want to delete this note?')) {
+    try {
+      const response = await apiRequest(`/api/notes/${id}`, {
+        method: 'DELETE',
+      });
 
-  const handleToggleArchive = (id: number) => {
-    setNotes(notes.map(note => 
-      note.id === id ? { ...note, isArchived: !note.isArchived } : note
-    ));
-  };
+      // Check if response is valid JSON
+      if (response && response.message) {
+        setNotes(notes.filter(note => note.id !== id));
+        fetchData(); // Refresh data
+        alert('Note deleted successfully');
+      } else if (response && response.error) {
+        alert(`Error deleting note: ${response.error}`);
+      } else {
+         alert('Note deleted successfully,reload');
+      }
+    } catch (error: any) {
+      console.error('Error deleting note:', error);
+      
+      // Handle different types of errors
+      if (error.response && error.response.status === 404) {
+        alert('Note not found or endpoint does not exist');
+      } else if (error.response && error.response.status === 403) {
+        alert('You do not have permission to delete this note');
+      } else {
+        alert('Failed to delete note. Please try again.');
+      }
+    }
+  }
+};
 
-  const handleAddTag = (tag: string) => {
-    if (tag && !newNote.tags.includes(tag)) {
-      setNewNote({ ...newNote, tags: [...newNote.tags, tag] });
+  const handleTogglePin = async (id: number) => {
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+
+    try {
+      const response = await apiRequest<Note>(`/api/notes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_pinned: !note.is_pinned }),
+      });
+
+      if (response.data) {
+        setNotes(notes.map(note => 
+          note.id === id ? response.data! : note
+        ));
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error toggling pin:', error);
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setNewNote({ 
-      ...newNote, 
-      tags: newNote.tags.filter(tag => tag !== tagToRemove) 
-    });
+  const handleToggleArchive = async (id: number) => {
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+
+    try {
+      const response = await apiRequest<Note>(`/api/notes/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_archived: !note.is_archived }),
+      });
+
+      if (response.data) {
+        setNotes(notes.map(note => 
+          note.id === id ? response.data! : note
+        ));
+        fetchData(); // Refresh data
+      }
+    } catch (error) {
+      console.error('Error toggling archive:', error);
+    }
   };
 
-  // Format date
-  
+  // Get current user to display in UI if needed
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">My Notes</h1>
+            <p className="text-muted-foreground">Loading notes...</p>
+          </div>
+        </div>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading notes...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-6">
@@ -319,25 +334,25 @@ export function AssociateNotes() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded-lg">
-                <BookOpen className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">Categories</p>
-                <p className="text-2xl font-semibold text-foreground">{noteStats.byCategory.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-muted/5 to-transparent border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
               <div className="p-2 bg-secondary/10 rounded-lg">
                 <Folder className="w-5 h-5 text-secondary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Archived</p>
                 <p className="text-2xl font-semibold text-secondary">{noteStats.archived}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-success/10 rounded-lg">
+                <Tag className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Categories</p>
+                <p className="text-2xl font-semibold text-success">{categories.length - 1}</p>
               </div>
             </div>
           </CardContent>
@@ -419,6 +434,14 @@ export function AssociateNotes() {
                     onClick={() => {
                       setIsEditing(false);
                       setEditingNote(null);
+                      setNewNote({
+                        title: '',
+                        content: '',
+                        category: 'Uncategorized',
+                        tags: [],
+                        is_private: false,
+                        case_id: undefined
+                      });
                     }}
                   >
                     <X className="w-4 h-4" />
@@ -448,71 +471,50 @@ export function AssociateNotes() {
               />
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">
-                    Category
+                    Related Case (Optional)
                   </label>
-                  <Input
-                    placeholder="e.g., Client Meetings, Research"
-                    value={editingNote?.category || newNote.category}
-                    onChange={(e) => editingNote
-                      ? setEditingNote({...editingNote, category: e.target.value})
-                      : setNewNote({...newNote, category: e.target.value})
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Tags (comma separated)
-                  </label>
-                  <Input
-                    placeholder="e.g., urgent, client, research"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ',') {
-                        e.preventDefault();
-                        const input = e.currentTarget as HTMLInputElement;
-                        const tag = input.value.trim();
-                        if (tag) {
-                          if (editingNote) {
-                            setEditingNote({
-                              ...editingNote,
-                              tags: [...editingNote.tags, tag]
-                            });
-                          } else {
-                            handleAddTag(tag);
-                          }
-                          input.value = '';
-                        }
+                  <select
+                    value={editingNote?.case_id || newNote.case_id || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : undefined;
+                      if (editingNote) {
+                        setEditingNote({...editingNote, case_id: value || null});
+                      } else {
+                        setNewNote({...newNote, case_id: value});
                       }
                     }}
-                  />
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select a case (optional)...</option>
+                    {cases.map(caseItem => (
+                      <option key={caseItem.id} value={caseItem.id}>
+                        {caseItem.case_number} - {caseItem.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
-              {(editingNote?.tags.length || newNote.tags.length) > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {(editingNote?.tags || newNote.tags).map((tag, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-1 px-3 py-1 bg-primary/10 rounded-full text-sm"
-                    >
-                      <span className="text-primary">#{tag}</span>
-                      <button
-                        onClick={() => editingNote
-                          ? setEditingNote({
-                              ...editingNote,
-                              tags: editingNote.tags.filter(t => t !== tag)
-                            })
-                          : handleRemoveTag(tag)
-                        }
-                        className="ml-1 text-muted-foreground hover:text-destructive"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingNote?.is_private || newNote.is_private}
+                    onChange={(e) => {
+                      if (editingNote) {
+                        setEditingNote({...editingNote, is_private: e.target.checked});
+                      } else {
+                        setNewNote({...newNote, is_private: e.target.checked});
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
+                  />
+                  <span className="text-sm text-foreground">Private Note (only visible to you)</span>
+                </label>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -537,6 +539,7 @@ export function AssociateNotes() {
                 onDelete={handleDeleteNote}
                 onTogglePin={handleTogglePin}
                 onToggleArchive={handleToggleArchive}
+                currentUser={currentUser}
               />
             ))}
           </div>
@@ -548,15 +551,17 @@ export function AssociateNotes() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-foreground">All Notes</h2>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={(e) => setShowArchived(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
-              />
-              <span className="text-sm text-foreground">Show archived notes</span>
-            </label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
+                />
+                <span className="text-sm text-foreground">Show archived notes</span>
+              </label>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {otherNotes.map(note => (
@@ -567,6 +572,7 @@ export function AssociateNotes() {
                 onDelete={handleDeleteNote}
                 onTogglePin={handleTogglePin}
                 onToggleArchive={handleToggleArchive}
+                currentUser={currentUser}
               />
             ))}
           </div>
@@ -592,6 +598,7 @@ export function AssociateNotes() {
                 onDelete={handleDeleteNote}
                 onTogglePin={handleTogglePin}
                 onToggleArchive={handleToggleArchive}
+                currentUser={currentUser}
               />
             ))}
           </div>
@@ -627,16 +634,19 @@ interface NoteCardProps {
   onDelete: (id: number) => void;
   onTogglePin: (id: number) => void;
   onToggleArchive: (id: number) => void;
+  currentUser: any;
 }
 
-function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: NoteCardProps) {
+function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive, currentUser }: NoteCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
   
@@ -644,16 +654,29 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: Note
     ? note.content.substring(0, 150) + '...'
     : note.content;
 
+  const getNoteTags = () => {
+    return note.tags || [];
+  };
+
+  // Check if current user created this note
+  const isMyNote = note.user_id === currentUser.id;
+
   return (
-    <Card className={`hover:shadow-lg transition-shadow ${note.isPinned ? 'border-warning/30' : ''}`}>
+    <Card className={`hover:shadow-lg transition-shadow ${note.is_pinned ? 'border-warning/30' : ''}`}>
       <CardContent className="p-5">
         <div className="space-y-3">
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                {note.isPinned && (
+                {note.is_pinned && (
                   <Pin className="w-4 h-4 text-warning" />
+                )}
+                {note.is_private && (
+                  <Badge variant="default" className="text-xs">Private</Badge>
+                )}
+                {isMyNote && (
+                  <Badge variant="default" className="text-xs">My Note</Badge>
                 )}
                 <h3 className="text-sm font-semibold text-foreground truncate">
                   {note.title}
@@ -665,8 +688,14 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: Note
                 </Badge>
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {formatDate(note.updatedAt)}
+                  {formatDate(note.updated_at)}
                 </span>
+                {note.case_title && (
+                  <span className="flex items-center gap-1">
+                    <Folder className="w-3 h-3" />
+                    {note.case_title}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-1">
@@ -675,7 +704,7 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: Note
                 size="sm"
                 onClick={() => onTogglePin(note.id)}
               >
-                {note.isPinned ? (
+                {note.is_pinned ? (
                   <PinOff className="w-4 h-4" />
                 ) : (
                   <Pin className="w-4 h-4" />
@@ -700,9 +729,9 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: Note
           </div>
 
           {/* Tags */}
-          {note.tags.length > 0 && (
+          {getNoteTags().length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {note.tags.map((tag, idx) => (
+              {getNoteTags().map((tag, idx) => (
                 <span
                   key={idx}
                   className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground"
@@ -716,7 +745,7 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin, onToggleArchive }: Note
           {/* Footer */}
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="text-xs text-muted-foreground">
-              {note.wordCount} words • Last accessed: {formatDate(note.lastAccessed)}
+              {note.word_count || 0} words • {note.character_count || 0} chars
             </div>
             <div className="flex gap-1">
               <Button

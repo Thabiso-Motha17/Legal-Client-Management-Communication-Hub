@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
@@ -18,108 +18,174 @@ import {
   ChevronRight,
   Folder,
   Users,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
+import { clientCaseService, authService } from '../services/api';
+import type{ Case, User as UserType } from '../../types/Types';
+
+interface TimelineEvent {
+  id: number;
+  date: string;
+  title: string;
+  description: string;
+  type: 'milestone' | 'document' | 'meeting' | 'note';
+}
+
+interface ClientCase extends Omit<Case, 'client_name' | 'assigned_to_name'> {
+  client_name?: string;
+  assigned_to_name?: string;
+  progress?: number;
+  timeline?: TimelineEvent[];
+}
 
 export function ClientCases() {
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [cases, setCases] = useState<ClientCase[]>([]);
+  const [selectedCase, setSelectedCase] = useState<ClientCase | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
 
-  const cases = [
-    {
-      id: 'CAS-2026-001',
-      title: 'Johnson Estate Planning',
-      type: 'Estate Planning',
-      status: 'Active',
-      filingDate: 'Nov 15, 2025',
-      lastUpdate: 'Jan 10, 2026',
-      priority: 'High',
-      attorney: 'Sarah Mitchell',
-      nextEvent: 'Jan 25, 2026',
-      progress: 75,
-      description: 'Comprehensive estate planning including will, trust, and power of attorney preparation.'
-    },
-    {
-      id: 'CAS-2025-045',
-      title: 'Property Transfer - Downtown Condo',
-      type: 'Real Estate',
-      status: 'Active',
-      filingDate: 'Sep 10, 2025',
-      lastUpdate: 'Dec 20, 2025',
-      priority: 'Medium',
-      attorney: 'Michael Chen',
-      nextEvent: 'Feb 15, 2026',
-      progress: 40,
-      description: 'Condominium title transfer and closing process.'
-    },
-    {
-      id: 'CAS-2025-032',
-      title: 'Business Contract Review',
-      type: 'Business Law',
-      status: 'On Hold',
-      filingDate: 'Jul 22, 2025',
-      lastUpdate: 'Oct 15, 2025',
-      priority: 'Medium',
-      attorney: 'Robert Johnson',
-      nextEvent: 'Pending',
-      progress: 60,
-      description: 'Review of vendor contracts and service agreements.'
-    },
-    {
-      id: 'CAS-2024-128',
-      title: 'Will & Testament - Smith Family',
-      type: 'Estate Planning',
-      status: 'Completed',
-      filingDate: 'Mar 5, 2024',
-      lastUpdate: 'Jun 30, 2024',
-      priority: 'Low',
-      attorney: 'Sarah Mitchell',
-      nextEvent: 'N/A',
-      progress: 100,
-      description: 'Last will and testament preparation and notarization.'
-    },
-    {
-      id: 'CAS-2025-089',
-      title: 'Employment Dispute Resolution',
-      type: 'Employment Law',
-      status: 'Active',
-      filingDate: 'Oct 30, 2025',
-      lastUpdate: 'Jan 5, 2026',
-      priority: 'High',
-      attorney: 'Jennifer Park',
-      nextEvent: 'Jan 30, 2026',
-      progress: 30,
-      description: 'Workplace dispute mediation and resolution.'
-    },
-    {
-      id: 'CAS-2024-095',
-      title: 'Living Trust Setup',
-      type: 'Estate Planning',
-      status: 'Completed',
-      filingDate: 'Feb 15, 2024',
-      lastUpdate: 'May 10, 2024',
-      priority: 'Low',
-      attorney: 'Sarah Mitchell',
-      nextEvent: 'N/A',
-      progress: 100,
-      description: 'Revocable living trust establishment and funding.'
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Fetch data when selecting a case
+  useEffect(() => {
+    if (selectedCaseId) {
+      fetchCaseDetails(selectedCaseId);
     }
-  ];
+  }, [selectedCaseId]);
 
-  const selectedCase = cases.find(c => c.id === selectedCaseId);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      const meData = await authService.getMe();
+      if (meData?.user) {
+        setCurrentUser(meData.user);
+      }
+
+      // Get client's cases
+      const casesData = await clientCaseService.getMyCases();
+      
+      // Transform and add progress calculation
+      const transformedCases = casesData.map(caseItem => ({
+        ...caseItem,
+        progress: calculateCaseProgress(caseItem),
+        timeline: generateTimeline(caseItem)
+      }));
+      
+      setCases(transformedCases);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load cases');
+      console.error('Error fetching cases:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCaseDetails = async (caseId: number) => {
+    try {
+      setLoading(true);
+      const caseData = await clientCaseService.getCaseById(caseId);
+      if (caseData) {
+        const caseWithProgress: ClientCase = {
+          ...caseData,
+          progress: calculateCaseProgress(caseData),
+          timeline: generateTimeline(caseData)
+        };
+        setSelectedCase(caseWithProgress);
+      }
+    } catch (err: any) {
+      setError('Failed to load case details');
+      console.error('Error fetching case details:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateCaseProgress = (caseItem: Case): number => {
+    // Calculate progress based on case status and duration
+    const statusWeights = {
+      'Active': 60,
+      'On Hold': 30,
+      'Closed': 100
+    };
+    
+    const baseProgress = statusWeights[caseItem.status] || 50;
+    
+    // Adjust based on time since opened
+    if (caseItem.date_opened) {
+      const openedDate = new Date(caseItem.date_opened);
+      const now = new Date();
+      const daysSinceOpened = Math.floor((now.getTime() - openedDate.getTime()) / (1000 * 3600 * 24));
+      
+      if (daysSinceOpened > 365) return Math.min(baseProgress + 20, 95);
+      if (daysSinceOpened > 180) return Math.min(baseProgress + 10, 90);
+    }
+    
+    return baseProgress;
+  };
+
+  const generateTimeline = (caseItem: Case): TimelineEvent[] => {
+    const timeline: TimelineEvent[] = [];
+    
+    // Case opened event
+    if (caseItem.date_opened) {
+      timeline.push({
+        id: 1,
+        date: caseItem.date_opened,
+        title: 'Case Opened',
+        description: `Case ${caseItem.case_number} was opened`,
+        type: 'milestone'
+      });
+    }
+    
+    // Last update event
+    if (caseItem.updated_at && caseItem.updated_at !== caseItem.created_at) {
+      timeline.push({
+        id: 2,
+        date: caseItem.updated_at,
+        title: 'Case Updated',
+        description: 'Case information was updated',
+        type: 'milestone'
+      });
+    }
+    
+    // Notes (you could fetch real notes here)
+    timeline.push({
+      id: 3,
+      date: new Date().toISOString().split('T')[0],
+      title: 'Initial Consultation',
+      description: 'Initial consultation with attorney completed',
+      type: 'meeting'
+    });
+    
+    // Sort by date descending
+    return timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
 
   const filteredCases = cases.filter(caseItem => {
-    const matchesSearch = caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         caseItem.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = 
+      caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caseItem.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (caseItem.file_number?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+    
     const matchesStatus = filterStatus === 'all' || caseItem.status === filterStatus;
+    
     return matchesSearch && matchesStatus;
   });
 
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Active': return 'success';
-      case 'Completed': return 'secondary';
+      case 'Closed': return 'secondary';
       case 'On Hold': return 'warning';
       default: return 'default';
     }
@@ -127,90 +193,89 @@ export function ClientCases() {
 
   const getPriorityVariant = (priority: string) => {
     switch (priority) {
-      case 'High': return 'error';
-      case 'Medium': return 'warning';
-      case 'Low': return 'success';
+      case 'high': return 'error';
+      case 'medium': return 'warning';
+      case 'low': return 'success';
       default: return 'default';
     }
   };
 
   const getCaseTypeIcon = (type: string) => {
-    switch (type) {
-      case 'Estate Planning': return <FileText className="w-5 h-5 text-primary" />;
-      case 'Real Estate': return <MapPin className="w-5 h-5 text-success" />;
-      case 'Business Law': return <Briefcase className="w-5 h-5 text-warning" />;
-      case 'Employment Law': return <Users className="w-5 h-5 text-destructive" />;
-      default: return <Folder className="w-5 h-5 text-muted-foreground" />;
+    switch (type.toLowerCase()) {
+      case 'estate planning':
+      case 'wills & trusts':
+        return <FileText className="w-5 h-5 text-primary" />;
+      case 'real estate':
+      case 'property':
+        return <MapPin className="w-5 h-5 text-success" />;
+      case 'business':
+      case 'corporate':
+      case 'contract':
+        return <Briefcase className="w-5 h-5 text-warning" />;
+      case 'employment':
+      case 'labor':
+        return <Users className="w-5 h-5 text-destructive" />;
+      default:
+        return <Folder className="w-5 h-5 text-muted-foreground" />;
     }
   };
 
-  // Case details component
-  const CaseDetails = ({ caseData, onBack }: { caseData: any; onBack: () => void }) => {
-    const timeline = [
-      {
-        id: 1,
-        date: 'Jan 10, 2026',
-        title: 'Trust Agreement Draft Submitted',
-        description: 'Second revision of trust agreement prepared and uploaded for your review',
-        status: 'completed',
-        type: 'document'
-      },
-      {
-        id: 2,
-        date: 'Jan 8, 2026',
-        title: 'Property Deed Transfer Filed',
-        description: 'Property deed transfer documentation filed with county recorder',
-        status: 'completed',
-        type: 'filing'
-      },
-      {
-        id: 3,
-        date: 'Jan 5, 2026',
-        title: 'Will Finalized',
-        description: 'Last will and testament signed and notarized',
-        status: 'completed',
-        type: 'milestone'
-      },
-      {
-        id: 4,
-        date: 'Dec 20, 2025',
-        title: 'Initial Consultation Completed',
-        description: 'Estate planning goals and objectives discussed',
-        status: 'completed',
-        type: 'meeting'
-      },
-      {
-        id: 5,
-        date: 'Nov 15, 2025',
-        title: 'Case Opened',
-        description: 'Estate planning case initiated',
-        status: 'completed',
-        type: 'milestone'
-      }
-    ];
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
-    const milestones = [
+  const timeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    let interval = Math.floor(seconds / 31536000);
+    if (interval > 1) return interval + ' years ago';
+    
+    interval = Math.floor(seconds / 2592000);
+    if (interval > 1) return interval + ' months ago';
+    
+    interval = Math.floor(seconds / 86400);
+    if (interval > 1) return interval + ' days ago';
+    
+    interval = Math.floor(seconds / 3600);
+    if (interval > 1) return interval + ' hours ago';
+    
+    interval = Math.floor(seconds / 60);
+    if (interval > 1) return interval + ' minutes ago';
+    
+    return 'just now';
+  };
+
+  // Case details component
+  const CaseDetails = ({ caseData, onBack }: { caseData: ClientCase; onBack: () => void }) => {
+    const [milestones, setMilestones] = useState([
       { title: 'Case Initiated', completed: true },
-      { title: 'Document Collection', completed: true },
-      { title: 'Will Preparation', completed: true },
-      { title: 'Trust Agreement', completed: false },
-      { title: 'Final Review', completed: false },
-      { title: 'Case Closure', completed: false }
-    ];
+      { title: 'Document Collection', completed: caseData.progress ? caseData.progress > 20 : false },
+      { title: 'Initial Review', completed: caseData.progress ? caseData.progress > 40 : false },
+      { title: 'Active Processing', completed: caseData.progress ? caseData.progress > 60 : false },
+      { title: 'Final Review', completed: caseData.progress ? caseData.progress > 80 : false },
+      { title: 'Case Closure', completed: caseData.status === 'Closed' }
+    ]);
 
     const caseDetails = {
       ...caseData,
       attorney: {
-        name: 'Sarah Mitchell',
-        title: 'Senior Partner',
+        name: caseData.assigned_to_name || 'Assigned Attorney',
+        title: 'Attorney',
         phone: '(555) 987-6543',
-        email: 'sarah.mitchell@lawfirm.com'
+        email: 'attorney@lawfirm.com'
       },
       nextEvent: {
-        title: 'Final Review Meeting',
-        date: 'Jan 25, 2026',
-        time: '2:00 PM',
-        location: '123 Legal Plaza, Suite 400'
+        title: caseData.deadline ? 'Upcoming Deadline' : 'Next Review',
+        date: caseData.deadline ? formatDate(caseData.deadline) : 'TBD',
+        time: caseData.deadline ? '9:00 AM' : 'TBD',
+        location: 'Law Firm Office'
       }
     };
 
@@ -228,12 +293,16 @@ export function ClientCases() {
             Back to Cases
           </Button>
           <div className="flex-1">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-foreground">{caseDetails.title}</h1>
-              <Badge variant={getStatusVariant(caseDetails.status)}>{caseDetails.status}</Badge>
-              <Badge variant={getPriorityVariant(caseDetails.priority)}>{caseDetails.priority} Priority</Badge>
+              <Badge variant={getStatusVariant(caseDetails.status)}>
+                {caseDetails.status}
+              </Badge>
+              <Badge variant={getPriorityVariant(caseDetails.priority)}>
+                {caseDetails.priority.charAt(0).toUpperCase() + caseDetails.priority.slice(1)} Priority
+              </Badge>
             </div>
-            <p className="text-muted-foreground">Case #{caseDetails.id}</p>
+            <p className="text-muted-foreground">Case #{caseDetails.case_number}</p>
           </div>
         </div>
 
@@ -249,24 +318,30 @@ export function ClientCases() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Description</p>
-                    <p className="text-foreground">{caseDetails.description}</p>
+                    <p className="text-foreground">{caseDetails.description || 'No description available'}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Case Type</p>
-                      <p className="text-foreground font-medium">{caseDetails.type}</p>
+                      <p className="text-foreground font-medium">{caseDetails.case_type}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Status</p>
-                      <Badge variant={getStatusVariant(caseDetails.status)}>{caseDetails.status}</Badge>
+                      <Badge variant={getStatusVariant(caseDetails.status)}>
+                        {caseDetails.status}
+                      </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Filing Date</p>
-                      <p className="text-foreground font-medium">{caseDetails.filingDate}</p>
+                      <p className="text-foreground font-medium">
+                        {caseDetails.date_opened ? formatDate(caseDetails.date_opened) : 'N/A'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Last Update</p>
-                      <p className="text-foreground font-medium">{caseDetails.lastUpdate}</p>
+                      <p className="text-foreground font-medium">
+                        {caseDetails.updated_at ? timeAgo(caseDetails.updated_at) : 'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -281,13 +356,17 @@ export function ClientCases() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">{caseDetails.progress}% Complete</span>
-                    <span className="text-xs text-muted-foreground">{milestones.filter(m => m.completed).length}/{milestones.length} milestones</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {caseDetails.progress || 0}% Complete
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {milestones.filter(m => m.completed).length}/{milestones.length} milestones
+                    </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
                     <div 
                       className="bg-primary h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${caseDetails.progress}%` }}
+                      style={{ width: `${caseDetails.progress || 0}%` }}
                     ></div>
                   </div>
                   <div className="space-y-3">
@@ -328,36 +407,44 @@ export function ClientCases() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {timeline.map((event, index) => (
-                    <div key={event.id} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          event.type === 'milestone' ? 'bg-primary/10 text-primary' :
-                          event.type === 'document' ? 'bg-accent/10 text-accent' :
-                          event.type === 'meeting' ? 'bg-success/10 text-success' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
-                          {event.type === 'document' ? (
-                            <FileText className="w-5 h-5" />
-                          ) : event.type === 'meeting' ? (
-                            <User className="w-5 h-5" />
-                          ) : (
-                            <CheckCircle className="w-5 h-5" />
+                  {caseDetails.timeline && caseDetails.timeline.length > 0 ? (
+                    caseDetails.timeline.map((event, index) => (
+                      <div key={event.id} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            event.type === 'milestone' ? 'bg-primary/10 text-primary' :
+                            event.type === 'document' ? 'bg-accent/10 text-accent' :
+                            event.type === 'meeting' ? 'bg-success/10 text-success' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {event.type === 'document' ? (
+                              <FileText className="w-5 h-5" />
+                            ) : event.type === 'meeting' ? (
+                              <User className="w-5 h-5" />
+                            ) : (
+                              <CheckCircle className="w-5 h-5" />
+                            )}
+                          </div>
+                          {index < caseDetails.timeline!.length - 1 && (
+                            <div className="w-0.5 h-full min-h-[40px] bg-border mt-2"></div>
                           )}
                         </div>
-                        {index < timeline.length - 1 && (
-                          <div className="w-0.5 h-full min-h-[40px] bg-border mt-2"></div>
-                        )}
-                      </div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-sm font-medium text-foreground">{event.title}</p>
-                          <Badge variant="secondary" className="text-xs">{event.date}</Badge>
+                        <div className="flex-1 pb-6">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-medium text-foreground">{event.title}</p>
+                            <Badge variant="secondary" className="text-xs">
+                              {formatDate(event.date)}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{event.description}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{event.description}</p>
                       </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">No timeline events yet</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -373,9 +460,11 @@ export function ClientCases() {
               <CardContent>
                 <div className="text-center mb-4">
                   <div className="w-20 h-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-3 text-xl font-medium">
-                    {caseDetails.attorney.name.split(' ').map((n: string) => n[0]).join('')}
+                    {caseDetails.assigned_to_name?.split(' ').map(n => n[0]).join('') || 'AA'}
                   </div>
-                  <h3 className="text-foreground font-medium mb-1">{caseDetails.attorney.name}</h3>
+                  <h3 className="text-foreground font-medium mb-1">
+                    {caseDetails.assigned_to_name || 'Assigned Attorney'}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-4">{caseDetails.attorney.title}</p>
                 </div>
                 
@@ -438,17 +527,21 @@ export function ClientCases() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start gap-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2"
+                  onClick={() => window.location.href = `/documents?case_id=${caseData.id}`}
+                >
                   <FileText className="w-4 h-4" />
                   View Documents
                 </Button>
-                <Button variant="outline" className="w-full justify-start gap-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2"
+                  onClick={() => window.location.href = `mailto:${caseDetails.attorney.email}`}
+                >
                   <Mail className="w-4 h-4" />
                   Message Attorney
-                </Button>
-                <Button variant="outline" className="w-full justify-start gap-2">
-                  <Briefcase className="w-4 h-4" />
-                  Upload Documents
                 </Button>
               </CardContent>
             </Card>
@@ -457,6 +550,41 @@ export function ClientCases() {
       </div>
     );
   };
+
+  // Loading state
+  if (loading && !selectedCaseId) {
+    return (
+      <div className="p-6 md:p-8 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-muted-foreground">Loading your cases...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !selectedCaseId) {
+    return (
+      <div className="p-6 md:p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <h2 className="text-lg font-semibold text-red-800">Error Loading Cases</h2>
+          </div>
+          <p className="text-red-700 mb-4">{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={fetchData}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Cases list view
   if (!selectedCaseId) {
@@ -516,7 +644,7 @@ export function ClientCases() {
               </div>
               <p className="text-sm text-muted-foreground mb-1">Completed</p>
               <p className="text-2xl font-semibold text-secondary">
-                {cases.filter(c => c.status === 'Completed').length}
+                {cases.filter(c => c.status === 'Closed').length}
               </p>
             </CardContent>
           </Card>
@@ -546,7 +674,7 @@ export function ClientCases() {
                   <option value="all">All Status</option>
                   <option value="Active">Active</option>
                   <option value="On Hold">On Hold</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Closed">Completed</option>
                 </select>
               </div>
             </div>
@@ -568,7 +696,11 @@ export function ClientCases() {
               <div className="px-6 py-12 text-center">
                 <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground mb-2">No cases found</p>
-                <p className="text-sm text-muted-foreground">Try adjusting your search or filter</p>
+                {cases.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">You don't have any cases yet</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Try adjusting your search or filter</p>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-border">
@@ -581,29 +713,31 @@ export function ClientCases() {
                     <div className="flex items-center gap-4">
                       {/* Case Icon */}
                       <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        {getCaseTypeIcon(caseItem.type)}
+                        {getCaseTypeIcon(caseItem.case_type)}
                       </div>
 
                       {/* Case Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="text-sm font-medium text-foreground">{caseItem.title}</h3>
                           <Badge variant={getStatusVariant(caseItem.status)} className="flex-shrink-0">
                             {caseItem.status}
                           </Badge>
                           <Badge variant={getPriorityVariant(caseItem.priority)} className="flex-shrink-0">
-                            {caseItem.priority}
+                            {caseItem.priority.charAt(0).toUpperCase() + caseItem.priority.slice(1)}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground truncate mb-2">{caseItem.description}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground truncate mb-2">
+                          {caseItem.description || 'No description available'}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            Filed: {caseItem.filingDate}
+                            Filed: {caseItem.date_opened ? formatDate(caseItem.date_opened) : 'N/A'}
                           </span>
-                          <span>Case #{caseItem.id}</span>
-                          <span>{caseItem.type}</span>
-                          <span>Attorney: {caseItem.attorney}</span>
+                          <span>Case #{caseItem.case_number}</span>
+                          <span>{caseItem.case_type}</span>
+                          <span>Attorney: {caseItem.assigned_to_name || 'Not assigned'}</span>
                         </div>
                       </div>
 
@@ -614,14 +748,14 @@ export function ClientCases() {
                           <div className="w-32 bg-muted rounded-full h-2">
                             <div 
                               className="bg-primary h-2 rounded-full"
-                              style={{ width: `${caseItem.progress}%` }}
+                              style={{ width: `${caseItem.progress || 0}%` }}
                             ></div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">{caseItem.progress}%</p>
+                          <p className="text-xs text-muted-foreground mt-1">{caseItem.progress || 0}%</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-sm text-muted-foreground hidden md:inline">
-                            Next: {caseItem.nextEvent}
+                            {caseItem.deadline ? `Due: ${formatDate(caseItem.deadline)}` : 'No deadline'}
                           </span>
                           <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                         </div>
@@ -642,9 +776,9 @@ export function ClientCases() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {Array.from(new Set(cases.map(c => c.type))).map(type => {
-                  const count = cases.filter(c => c.type === type).length;
-                  const percentage = (count / cases.length * 100).toFixed(0);
+                {Array.from(new Set(cases.map(c => c.case_type))).map(type => {
+                  const count = cases.filter(c => c.case_type === type).length;
+                  const percentage = cases.length > 0 ? (count / cases.length * 100).toFixed(0) : '0';
                   return (
                     <div key={type} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -658,7 +792,9 @@ export function ClientCases() {
                             style={{ width: `${percentage}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm font-medium text-foreground min-w-[40px]">{count} ({percentage}%)</span>
+                        <span className="text-sm font-medium text-foreground min-w-[40px]">
+                          {count} ({percentage}%)
+                        </span>
                       </div>
                     </div>
                   );
@@ -683,10 +819,6 @@ export function ClientCases() {
                       <Mail className="w-4 h-4" />
                       Contact Attorney
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Briefcase className="w-4 h-4" />
-                      New Case
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -698,5 +830,16 @@ export function ClientCases() {
   }
 
   // Case details view
+  if (!selectedCase) {
+    return (
+      <div className="p-6 md:p-8">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+          <p className="text-muted-foreground">Loading case details...</p>
+        </div>
+      </div>
+    );
+  }
+
   return <CaseDetails caseData={selectedCase} onBack={() => setSelectedCaseId(null)} />;
 }

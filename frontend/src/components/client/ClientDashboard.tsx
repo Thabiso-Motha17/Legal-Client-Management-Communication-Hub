@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
 import { 
   FileText, 
-  MessageSquare, 
   Calendar,
   Download,
   AlertCircle,
@@ -15,9 +14,17 @@ import {
   TrendingUp,
   Eye,
   ChevronRight,
-  Folder
+  Folder,
+  Loader2,
+  Clock
 } from 'lucide-react';
 import { FaMoneyBillAlt } from 'react-icons/fa';
+import { 
+  clientDashboardService, 
+  caseService, 
+  authService 
+} from '../services/api';
+import type{ Case, Document, User as UserType } from '../../types/Types';
 
 interface ClientDashboardProps {
   onNavigate: (page: string) => void;
@@ -26,179 +33,249 @@ interface ClientDashboardProps {
 export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [clientStats, setClientStats] = useState({
+    totalCases: 0,
+    activeCases: 0,
+    completedCases: 0,
+    totalDocuments: 0,
+    outstandingBalance: 0,
+    totalBilled: 0
+  });
+  const [cases, setCases] = useState<Case[]>([]);
+  const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
 
-  const clientStats = {
-    totalCases: 4,
-    activeCases: 2,
-    completedCases: 1,
-    pendingTasks: 7,
-    totalDocuments: 28,
-    unreadMessages: 3,
-    outstandingBalance: 2450,
-    totalBilled: 12850
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      const meData = await authService.getMe();
+      if (meData?.user) {
+        setCurrentUser(meData.user);
+      }
+
+      // Get dashboard stats
+      const stats = await clientDashboardService.getClientStats();
+      setClientStats(stats);
+
+      // Get client's cases
+      const casesData = await caseService.getAll();
+      setCases(casesData);
+
+      // Get recent documents
+      const recentDocs = await clientDashboardService.getRecentDocuments(4);
+      setRecentDocuments(recentDocs);
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard data');
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const cases = [
-    {
-      id: 'CAS-2026-001',
-      title: 'Johnson Estate Planning',
-      type: 'Estate Planning',
-      status: 'Active',
-      filingDate: 'Nov 15, 2025',
-      lastUpdate: 'Jan 10, 2026',
-      attorney: 'Sarah Mitchell',
-      nextEvent: 'Jan 25, 2026',
-      progress: 65,
-      priority: 'High',
-      description: 'Comprehensive estate planning including will, trust, and power of attorney preparation.',
-      documents: 12,
-      unreadMessages: 1
-    },
-    {
-      id: 'CAS-2025-045',
-      title: 'Property Transfer - Downtown Condo',
-      type: 'Real Estate',
-      status: 'Active',
-      filingDate: 'Sep 10, 2025',
-      lastUpdate: 'Dec 20, 2025',
-      attorney: 'Michael Chen',
-      nextEvent: 'Feb 15, 2026',
-      progress: 40,
-      priority: 'Medium',
-      description: 'Condominium title transfer and closing process.',
-      documents: 8,
-      unreadMessages: 0
-    },
-    {
-      id: 'CAS-2025-032',
-      title: 'Business Contract Review',
-      type: 'Business Law',
-      status: 'On Hold',
-      filingDate: 'Jul 22, 2025',
-      lastUpdate: 'Oct 15, 2025',
-      attorney: 'Robert Johnson',
-      nextEvent: 'Pending',
-      progress: 60,
-      priority: 'Medium',
-      description: 'Review of vendor contracts and service agreements.',
-      documents: 6,
-      unreadMessages: 2
-    },
-    {
-      id: 'CAS-2024-128',
-      title: 'Will & Testament - Smith Family',
-      type: 'Estate Planning',
-      status: 'Completed',
-      filingDate: 'Mar 5, 2024',
-      lastUpdate: 'Jun 30, 2024',
-      attorney: 'Sarah Mitchell',
-      nextEvent: 'N/A',
-      progress: 100,
-      priority: 'Low',
-      description: 'Last will and testament preparation and notarization.',
-      documents: 5,
-      unreadMessages: 0
-    }
-  ];
-
-  const recentDocuments = [
-    { id: 1, name: 'Trust Agreement - Draft v2.pdf', date: 'Jan 10, 2026', size: '2.4 MB', caseId: 'CAS-2026-001' },
-    { id: 2, name: 'Property Deed Transfer.pdf', date: 'Jan 8, 2026', size: '1.8 MB', caseId: 'CAS-2025-045' },
-    { id: 3, name: 'Will - Final Version.pdf', date: 'Jan 5, 2026', size: '856 KB', caseId: 'CAS-2024-128' },
-    { id: 4, name: 'Business Contract - Vendor A.pdf', date: 'Oct 10, 2025', size: '1.2 MB', caseId: 'CAS-2025-032' }
-  ];
-
-  const recentMessages = [
-    { id: 1, from: 'Sarah Mitchell', subject: 'Trust agreement review needed', date: 'Jan 10, 2026', unread: true, caseId: 'CAS-2026-001' },
-    { id: 2, from: 'Michael Chen', subject: 'Property transfer update', date: 'Jan 8, 2026', unread: false, caseId: 'CAS-2025-045' },
-    { id: 3, from: 'Robert Johnson', subject: 'Contract review delayed', date: 'Jan 7, 2026', unread: false, caseId: 'CAS-2025-032' }
-  ];
-
   const filteredCases = cases.filter(caseItem => {
-    const matchesSearch = caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         caseItem.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || caseItem.status === filterStatus;
+    const matchesSearch = 
+      caseItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caseItem.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caseItem.file_number.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = filterStatus === 'all' || 
+      (filterStatus === 'Active' && caseItem.status === 'Active') ||
+      (filterStatus === 'On Hold' && caseItem.status === 'On Hold') ||
+      (filterStatus === 'Completed' && caseItem.status === 'Closed');
+    
     return matchesSearch && matchesStatus;
   });
 
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Active': return 'success';
-      case 'Completed': return 'secondary';
+      case 'Closed': return 'secondary';
       case 'On Hold': return 'warning';
       default: return 'default';
     }
   };
 
-
-  const getCaseTypeIcon = (type: string) => {
-    switch (type) {
-      case 'Estate Planning': return <FileText className="w-5 h-5 text-primary" />;
-      case 'Real Estate': return <Calendar className="w-5 h-5 text-success" />;
-      case 'Business Law': return <Folder className="w-5 h-5 text-warning" />;
-      default: return <FileText className="w-5 h-5 text-muted-foreground" />;
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'Active': return 'Active';
+      case 'Closed': return 'Completed';
+      case 'On Hold': return 'On Hold';
+      default: return status;
     }
   };
+
+  const getCaseTypeIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'estate planning':
+      case 'wills & trusts':
+        return <FileText className="w-5 h-5 text-blue-500" />;
+      case 'real estate':
+      case 'property':
+        return <Calendar className="w-5 h-5 text-green-500" />;
+      case 'business':
+      case 'corporate':
+      case 'contract':
+        return <Folder className="w-5 h-5 text-yellow-500" />;
+      default:
+        return <FileText className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const calculateProgress = (caseItem: Case): number => {
+    // Simple progress calculation based on case age and status
+    const statusWeights = {
+      'Active': 60,
+      'On Hold': 30,
+      'Closed': 100
+    };
+    
+    const baseProgress = statusWeights[caseItem.status] || 50;
+    
+    // Adjust based on time since opened
+    if (caseItem.date_opened) {
+      const openedDate = new Date(caseItem.date_opened);
+      const now = new Date();
+      const daysSinceOpened = Math.floor((now.getTime() - openedDate.getTime()) / (1000 * 3600 * 24));
+      
+      if (daysSinceOpened > 365) return Math.min(baseProgress + 20, 95);
+      if (daysSinceOpened > 180) return Math.min(baseProgress + 10, 90);
+    }
+    
+    return baseProgress;
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-muted-foreground">Loading your dashboard...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 md:p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <h2 className="text-lg font-semibold text-red-800">Error Loading Dashboard</h2>
+          </div>
+          <p className="text-red-700 mb-4">{error}</p>
+          <Button 
+            variant="outline" 
+            onClick={fetchDashboardData}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-6">
       {/* Welcome Header */}
       <div>
-        <h1 className="text-foreground mb-2">Welcome back, John</h1>
+        <h1 className="text-foreground mb-2">
+          Welcome back, {currentUser?.full_name?.split(' ')[0] || 'Client'}
+        </h1>
         <p className="text-muted-foreground">Overview of all your cases and recent activity</p>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => onNavigate('cases')}>
+        <Card 
+          className="cursor-pointer hover:border-blue-500/50 transition-colors" 
+          onClick={() => onNavigate('cases')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Folder className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Folder className="w-5 h-5 text-blue-500" />
               </div>
-              <TrendingUp className="w-4 h-4 text-success" />
+              <TrendingUp className="w-4 h-4 text-green-500" />
             </div>
             <p className="text-sm text-muted-foreground mb-1">Total Cases</p>
             <p className="text-2xl font-semibold text-foreground">{clientStats.totalCases}</p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-success/50 transition-colors" onClick={() => onNavigate('documents')}>
+        <Card 
+          className="cursor-pointer hover:border-green-500/50 transition-colors" 
+          onClick={() => onNavigate('documents')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-success" />
+              <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-green-500" />
               </div>
-              <AlertCircle className="w-4 h-4 text-warning" />
+              <AlertCircle className="w-4 h-4 text-yellow-500" />
             </div>
             <p className="text-sm text-muted-foreground mb-1">Pending Review</p>
-            <p className="text-2xl font-semibold text-foreground">{clientStats.pendingTasks}</p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-accent/50 transition-colors" onClick={() => onNavigate('messages')}>
+        <Card 
+          className="cursor-pointer hover:border-blue-500/50 transition-colors" 
+          onClick={() => onNavigate('documents')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-accent" />
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-blue-500" />
               </div>
-              <Badge variant="error">{clientStats.unreadMessages} New</Badge>
+              <BarChart3 className="w-4 h-4 text-gray-400" />
             </div>
-            <p className="text-sm text-muted-foreground mb-1">Unread Messages</p>
-            <p className="text-2xl font-semibold text-foreground">{clientStats.unreadMessages}</p>
+            <p className="text-sm text-muted-foreground mb-1">Total Documents</p>
+            <p className="text-2xl font-semibold text-foreground">{clientStats.totalDocuments}</p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:border-warning/50 transition-colors" onClick={() => onNavigate('billing')}>
+        <Card 
+          className="cursor-pointer hover:border-yellow-500/50 transition-colors" 
+          onClick={() => onNavigate('billing')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                <FaMoneyBillAlt className="w-5 h-5 text-warning" />
+              <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                <FaMoneyBillAlt className="w-5 h-5 text-yellow-500" />
               </div>
-              <BarChart3 className="w-4 h-4 text-muted-foreground" />
+              <BarChart3 className="w-4 h-4 text-gray-400" />
             </div>
             <p className="text-sm text-muted-foreground mb-1">Outstanding Balance</p>
-            <p className="text-2xl font-semibold text-foreground">R{clientStats.outstandingBalance.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-foreground">
+              R{clientStats.outstandingBalance.toLocaleString()}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -214,7 +291,7 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
                 placeholder="Search cases by title or case number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -222,7 +299,7 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+                className="px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
               >
                 <option value="all">All Status</option>
                 <option value="Active">Active</option>
@@ -230,7 +307,11 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
                 <option value="Completed">Completed</option>
               </select>
             </div>
-            <Button variant="primary" onClick={() => onNavigate('cases')} className="gap-2">
+            <Button 
+              variant="primary" 
+              onClick={() => onNavigate('cases')} 
+              className="gap-2"
+            >
               <Eye className="w-4 h-4" />
               View All Cases
             </Button>
@@ -243,7 +324,7 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Folder className="w-5 h-5 text-primary" />
+              <Folder className="w-5 h-5 text-blue-500" />
               Your Cases ({filteredCases.length})
             </div>
             <Button variant="ghost" size="sm" onClick={() => onNavigate('cases')}>
@@ -255,78 +336,92 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
           {filteredCases.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground mb-2">No cases found</p>
-              <p className="text-sm text-muted-foreground">Try adjusting your search or filter</p>
+              <p className="text-muted-foreground mb-2">
+                {cases.length === 0 ? 'You don\'t have any cases yet' : 'No cases found'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {cases.length === 0 ? 'Contact your attorney to get started' : 'Try adjusting your search or filter'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-              {filteredCases.map((caseItem) => (
-                <div 
-                  key={caseItem.id}
-                  className="border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group"
-                  onClick={() => onNavigate(`case-${caseItem.id}`)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {getCaseTypeIcon(caseItem.type)}
-                      <div>
-                        <h3 className="text-sm font-medium text-foreground">{caseItem.title}</h3>
-                        <p className="text-xs text-muted-foreground">Case #{caseItem.id}</p>
+              {filteredCases.map((caseItem) => {
+                const progress = calculateProgress(caseItem);
+                const dueDate = caseItem.deadline ? formatDate(caseItem.deadline) : 'No deadline';
+                const lastUpdate = caseItem.updated_at ? formatDate(caseItem.updated_at) : 'Never';
+                
+                return (
+                  <div 
+                    key={caseItem.id}
+                    className="border border-border rounded-lg p-4 hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer group"
+                    onClick={() => onNavigate(`cases/${caseItem.id}`)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {getCaseTypeIcon(caseItem.case_type)}
+                        <div>
+                          <h3 className="text-sm font-medium text-foreground truncate">
+                            {caseItem.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">Case #{caseItem.case_number}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={getStatusVariant(caseItem.status)} className="text-xs">
+                          {getStatusDisplay(caseItem.status)}
+                        </Badge>
+                        {caseItem.priority === 'high' && (
+                          <AlertCircle className="w-4 h-4 text-red-500" />
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant={getStatusVariant(caseItem.status)} className="text-xs">
-                        {caseItem.status}
-                      </Badge>
-                      {caseItem.priority === 'High' && (
-                        <AlertCircle className="w-4 h-4 text-destructive" />
-                      )}
-                    </div>
-                  </div>
 
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{caseItem.description}</p>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                      {caseItem.description || 'No description available'}
+                    </p>
 
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Attorney</p>
-                      <p className="text-sm font-medium text-foreground">{caseItem.attorney}</p>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Attorney</p>
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {caseItem.assigned_to_name || 'Not assigned'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Due Date</p>
+                        <p className="text-sm font-medium text-foreground truncate">{dueDate}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Next Event</p>
-                      <p className="text-sm font-medium text-foreground">{caseItem.nextEvent}</p>
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Progress</span>
-                      <span>{caseItem.progress}%</span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Progress</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 transition-all duration-500" 
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-500" 
-                        style={{ width: `${caseItem.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <FileText className="w-3 h-3" />
-                        {caseItem.documents} docs
-                      </span>
-                      {caseItem.unreadMessages > 0 && (
-                        <span className="flex items-center gap-1 text-accent">
-                          <MessageSquare className="w-3 h-3" />
-                          {caseItem.unreadMessages} new
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          {caseItem.documents?.length || 0} docs
                         </span>
-                      )}
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Updated: {lastUpdate}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-blue-500 transition-colors" />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -334,11 +429,11 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
 
       <div className="grid w-full grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Documents */}
-        <Card className='w-257'>
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
+                <FileText className="w-5 h-5 text-blue-500" />
                 Recent Documents
               </div>
               <Button variant="ghost" size="sm" onClick={() => onNavigate('documents')}>
@@ -348,91 +443,141 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border">
-              {recentDocuments.map((doc) => (
-                <div key={doc.id} className="px-6 py-4 hover:bg-muted/30 transition-colors flex items-center justify-between group">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{doc.name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{doc.date}</span>
-                        <span>•</span>
-                        <span>{doc.size}</span>
-                        <span>•</span>
-                        <span className="text-primary">Case #{doc.caseId}</span>
+              {recentDocuments.length > 0 ? (
+                recentDocuments.map((doc) => (
+                  <div 
+                    key={doc.id} 
+                    className="px-6 py-4 hover:bg-muted/30 transition-colors flex items-center justify-between group"
+                    onClick={() => onNavigate(`documents/${doc.id}`)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{doc.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{formatDate(doc.uploaded_at)}</span>
+                          <span>•</span>
+                          <span>{formatFileSize(doc.file_size || 0)}</span>
+                          {doc.case_title && (
+                            <>
+                              <span>•</span>
+                              <span className="text-blue-500 truncate">
+                                {doc.case_title}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate(`documents/${doc.id}`);
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Handle download - you would implement this
+                          alert(`Downloading ${doc.name}`);
+                        }}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
+                ))
+              ) : (
+                <div className="px-6 py-8 text-center">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No documents yet</p>
                 </div>
-              ))}
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Deadlines */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-500" />
+                Upcoming Deadlines
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('cases')}>
+                View All
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border">
+              {cases
+                .filter(c => c.deadline && new Date(c.deadline) > new Date())
+                .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+                .slice(0, 4)
+                .map((caseItem) => {
+                  const deadlineDate = new Date(caseItem.deadline!);
+                  const today = new Date();
+                  const daysLeft = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                  
+                  return (
+                    <div 
+                      key={caseItem.id} 
+                      className="px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => onNavigate(`cases/${caseItem.id}`)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground truncate mb-1">
+                            {caseItem.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Case #{caseItem.case_number}</p>
+                        </div>
+                        <Badge 
+                          variant={daysLeft <= 7 ? 'error' : daysLeft <= 14 ? 'warning' : 'success'} 
+                          className="text-xs"
+                        >
+                          {daysLeft}d
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          Due: {formatDate(caseItem.deadline!)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {caseItem.assigned_to_name || 'Attorney'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              {cases.filter(c => c.deadline && new Date(c.deadline) > new Date()).length === 0 && (
+                <div className="px-6 py-8 text-center">
+                  <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No upcoming deadlines</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Messages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-accent" />
-              Recent Messages
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate('messages')}>
-              View All
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y divide-border">
-            {recentMessages.map((message) => (
-              <div 
-                key={message.id} 
-                className="px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer group"
-                onClick={() => onNavigate('messages')}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      message.unread ? 'bg-accent/10 text-accent' : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {message.from.split(' ').map((n: string) => n[0]).join('')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-foreground">{message.from}</p>
-                        {message.unread && (
-                          <Badge variant="error" className="text-xs">New</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-foreground truncate mb-1">{message.subject}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{message.date}</span>
-                        <span>•</span>
-                        <span className="text-primary">Case #{message.caseId}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <MessageSquare className="w-5 h-5 text-muted-foreground group-hover:text-accent transition-colors" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Quick Actions */}
-      <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+      <Card className="bg-gradient-to-br from-blue-500/5 to-transparent border-blue-500/20">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div>
@@ -442,15 +587,27 @@ export function ClientDashboard({ onNavigate }: ClientDashboardProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button variant="primary" onClick={() => onNavigate('messages')} className="gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Message Attorney
+              <Button 
+                variant="primary" 
+                onClick={() => onNavigate('documents')} 
+                className="gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                View Documents
               </Button>
-              <Button variant="outline" onClick={() => onNavigate('documents')} className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => onNavigate('documents')} 
+                className="gap-2"
+              >
                 <Plus className="w-4 h-4" />
                 Upload Document
               </Button>
-              <Button variant="outline" onClick={() => onNavigate('billing')} className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => onNavigate('billing')} 
+                className="gap-2"
+              >
                 <FaMoneyBillAlt className="w-4 h-4" />
                 Make Payment
               </Button>

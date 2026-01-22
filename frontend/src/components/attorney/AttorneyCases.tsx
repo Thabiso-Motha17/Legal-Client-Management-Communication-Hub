@@ -19,281 +19,361 @@ import {
   AlertCircle,
   Users,
   Clock,
-  CalendarDays,
-  CalendarCheck
+  CalendarCheck,
+  Building,
+  Eye,
+  StickyNote,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+import type { Case, CreateCaseData, UpdateCaseData, Client, User, Note } from '../../types/Types';
+import { apiRequest } from '../lib/api';
 
-export function AssociateCases() {
+interface AssociateCasesProps {
+  onNavigate: (page: string) => void;
+}
+
+export function AssociateCases({ onNavigate }: AssociateCasesProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
+  const [viewMode, setViewMode] = useState<'my-cases' | 'all-cases'>('my-cases');
   const [selectedCase, setSelectedCase] = useState<number | null>(null);
   const [showAddCaseForm, setShowAddCaseForm] = useState(false);
   const [editingCase, setEditingCase] = useState<number | null>(null);
   
-  // Simulate current logged in user
-  const currentUser = 'David Wilson'; // This would come from authentication in real app
+  const [cases, setCases] = useState<Case[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [caseNotes, setCaseNotes] = useState<Note[]>([]);
+  const [showNotes, setShowNotes] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingNotes, setLoadingNotes] = useState(false);
   
-  const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-  };
-
-  const formatDateDisplay = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const getDefaultDeadline = () => {
-    const today = new Date();
-    today.setDate(today.getDate() + 30); // Default deadline: 30 days from today
-    return today.toISOString().split('T')[0];
-  };
-
-  const [newCase, setNewCase] = useState({
-    fileNumber: '',
-    caseNo: '',
-    title: '',
-    client: '',
-    type: '',
-    status: 'Active',
-    priority: 'medium',
-    assignedTo: currentUser, 
-    description: '',
-    dateOpened: getTodayDate(),
-    deadline: getDefaultDeadline(),
-    addedBy: '',
-  });
-
-  // Update dateOpened when form opens
+  // Get current user from localStorage or context
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // Fetch initial data
   useEffect(() => {
-    if (showAddCaseForm && !editingCase) {
-      setNewCase(prev => ({ 
-        ...prev, 
-        dateOpened: getTodayDate(),
-        deadline: getDefaultDeadline(),
-        assignedTo: currentUser // Always set to current user for new cases
-      }));
+    fetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchData();
     }
-  }, [showAddCaseForm, editingCase]);
+  }, [currentUser]);
 
-  // Initial cases - these would be loaded from an API in a real app
-  const initialCases = [
-    {
-      id: 1,
-      fileNumber: 'FN-2026-EST-001',
-      caseNumber: 'CAS-2026-001',
-      title: 'Johnson Estate Planning',
-      client: 'John Johnson',
-      type: 'Estate Planning',
-      status: 'Active',
-      priority: 'high',
-      assignedTo: 'David Wilson',
-      dateOpened: '2025-11-15',
-      deadline: '2026-01-25',
-      description: 'Comprehensive estate planning including trust agreements, wills, and property transfers',
-      addedBy: 'current-user',
-      addedDate: 'Nov 15, 2025'
-    },
-    {
-      id: 2,
-      fileNumber: 'FN-2026-COR-003',
-      caseNumber: 'CAS-2026-003',
-      title: 'Corporate Merger - TechCo',
-      client: 'TechCo Industries',
-      type: 'Corporate',
-      status: 'Active',
-      priority: 'high',
-      assignedTo: 'Emma Roberts',
-      dateOpened: '2025-12-01',
-      deadline: '2026-02-01',
-      description: 'Corporate merger and acquisition legal documentation and due diligence',
-      addedBy: 'current-user',
-      addedDate: 'Dec 1, 2025'
-    },
-    {
-      id: 3,
-      fileNumber: 'FN-2025-LIT-087',
-      caseNumber: 'CAS-2025-087',
-      title: 'Smith Contract Dispute',
-      client: 'Smith LLC',
-      type: 'Litigation',
-      status: 'Active',
-      priority: 'medium',
-      assignedTo: 'Robert Chen',
-      dateOpened: '2025-10-20',
-      deadline: '2026-01-30',
-      description: 'Commercial contract dispute and negotiation support',
-      addedBy: 'another-user',
-      addedDate: 'Oct 20, 2025'
-    },
-    {
-      id: 4,
-      fileNumber: 'FN-2025-IP-072',
-      caseNumber: 'CAS-2025-072',
-      title: 'Williams Trademark Filing',
-      client: 'Williams Brands Inc',
-      type: 'Intellectual Property',
-      status: 'Active',
-      priority: 'low',
-      assignedTo: 'Lisa Wang',
-      dateOpened: '2025-09-15',
-      deadline: '2026-02-15',
-      description: 'Trademark registration and intellectual property protection',
-      addedBy: 'current-user',
-      addedDate: 'Sep 15, 2025'
-    },
-    {
-      id: 5,
-      fileNumber: 'FN-2025-EMP-063',
-      caseNumber: 'CAS-2025-063',
-      title: 'Davis Employment Agreement',
-      client: 'Davis Consulting',
-      type: 'Employment',
-      status: 'On Hold',
-      priority: 'medium',
-      assignedTo: 'James Miller',
-      dateOpened: '2025-08-10',
-      deadline: '2026-03-01',
-      description: 'Employment contract drafting and review',
-      addedBy: 'another-user',
-      addedDate: 'Aug 10, 2025'
+  const fetchCurrentUser = async () => {
+    try {
+      const response = await apiRequest<{ user: User }>('/api/auth/me');
+      if (response.data?.user) {
+        setCurrentUser(response.data.user);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
     }
-  ];
+  };
 
-  const [cases, setCases] = useState(initialCases);
+  const fetchData = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setLoading(true);
+      
+      // Fetch ALL cases from the company
+      const casesResponse = await apiRequest<Case[]>(`/api/cases`);
+      if (casesResponse.data) {
+        setCases(casesResponse.data);
+      }
+      
+      // Fetch clients assigned to the current user for creating new cases
+      const clientsResponse = await apiRequest<Client[]>(`/api/clients?assigned_to=${currentUser.id}`);
+      if (clientsResponse.data) {
+        setClients(clientsResponse.data);
+      }
+      
+      // Fetch users (associates) for the current law firm
+      const usersResponse = await apiRequest<User[]>(`/api/users`);
+      if (usersResponse.data) {
+        // Filter to show only associates from the same law firm
+        const lawFirmAssociates = usersResponse.data.filter(user => 
+          user.role === 'associate' && 
+          user.law_firm_id === currentUser.law_firm_id
+        );
+        setUsers(lawFirmAssociates);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const userCases = cases.filter(c => c.addedBy === 'current-user');
+  // Fetch notes for selected case
+  const fetchCaseNotes = async (caseId: number) => {
+    if (!caseId) return;
+    
+    try {
+      setLoadingNotes(true);
+      const response = await apiRequest<Note[]>(`/api/notes?case_id=${caseId}`);
+      if (response.data) {
+        setCaseNotes(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching case notes:', error);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
 
-  const filteredCases = userCases.filter(c => {
+  // When a case is selected, fetch its notes
+  useEffect(() => {
+    if (selectedCase) {
+      fetchCaseNotes(selectedCase);
+      setShowNotes(true);
+    } else {
+      setCaseNotes([]);
+      setShowNotes(false);
+    }
+  }, [selectedCase]);
+
+  // Filter cases based on view mode
+  const filteredCases = cases.filter(c => {
+    // Apply view mode filter
+    const matchesViewMode = viewMode === 'all-cases' || 
+      (viewMode === 'my-cases' && (c.assigned_to_user_id === currentUser?.id || c.added_by_user_id === currentUser?.id));
+    
+    // Apply search filter
     const matchesSearch = 
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.caseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.fileNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      c.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.client_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      c.file_number.toLowerCase().includes(searchQuery.toLowerCase());
     
+    // Apply status filter
     const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
+    
+    // Apply priority filter
     const matchesPriority = filterPriority === 'all' || c.priority === filterPriority;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesViewMode && matchesSearch && matchesStatus && matchesPriority;
   });
 
   const selectedCaseData = cases.find(c => c.id === selectedCase);
 
-  const generateCaseNumber = () => {
-    const currentYear = new Date().getFullYear();
-    const maxId = cases.reduce((max, c) => {
-      const idNum = parseInt(c.caseNumber.split('-')[2]) || 0;
-      return Math.max(max, idNum);
-    }, 0);
-    return `CAS-${currentYear}-${(maxId + 1).toString().padStart(3, '0')}`;
+  const formatDateDisplay = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
   };
 
-  const generateFileNumber = () => {
-    const currentYear = new Date().getFullYear();
-    const maxId = cases.reduce((max, c) => {
-      const match = c.fileNumber.match(/FN-\d{4}-\w+-(\d+)/);
-      return match ? Math.max(max, parseInt(match[1])) : max;
-    }, 0);
-    return `FN-${currentYear}-NEW-${(maxId + 1).toString().padStart(3, '0')}`;
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const handleAddCase = () => {
-    if (!newCase.title || !newCase.client || !newCase.type) {
+  const getDefaultDeadline = () => {
+    const today = new Date();
+    today.setDate(today.getDate() + 30);
+    return today.toISOString().split('T')[0];
+  };
+
+  const [newCase, setNewCase] = useState({
+    file_number: '',
+    case_number: '',
+    title: '',
+    client_id: 0,
+    case_type: '',
+    status: 'Active',
+    priority: 'medium',
+    assigned_to_user_id: 0,
+    description: '',
+    deadline: getDefaultDeadline(),
+  });
+
+  // Update assigned_to_user_id when form opens
+  useEffect(() => {
+    if (showAddCaseForm && !editingCase && currentUser) {
+      setNewCase(prev => ({ 
+        ...prev, 
+        assigned_to_user_id: currentUser.id || 0
+      }));
+    }
+  }, [showAddCaseForm, editingCase, currentUser]);
+
+  const generateCaseNumber = async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const response = await apiRequest<any[]>(`/api/cases`);
+      if (response.data) {
+        const maxId = response.data.reduce((max, c) => {
+          const idNum = parseInt(c.case_number.split('-')[2]) || 0;
+          return Math.max(max, idNum);
+        }, 0);
+        return `CAS-${currentYear}-${(maxId + 1).toString().padStart(3, '0')}`;
+      }
+    } catch (error) {
+      console.error('Error generating case number:', error);
+    }
+    return `CAS-${new Date().getFullYear()}-001`;
+  };
+
+  const generateFileNumber = async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const response = await apiRequest<any[]>(`/api/cases`);
+      if (response.data) {
+        const maxId = response.data.reduce((max, c) => {
+          const match = c.file_number.match(/FN-\d{4}-\w+-(\d+)/);
+          return match ? Math.max(max, parseInt(match[1])) : max;
+        }, 0);
+        return `FN-${currentYear}-NEW-${(maxId + 1).toString().padStart(3, '0')}`;
+      }
+    } catch (error) {
+      console.error('Error generating file number:', error);
+    }
+    return `FN-${new Date().getFullYear()}-NEW-001`;
+  };
+
+  const handleAddCase = async () => {
+    if (!newCase.title || !newCase.client_id || !newCase.case_type) {
       alert('Please fill in all required fields (Title, Client, Type)');
       return;
     }
 
-    const newCaseObj = {
-      id: cases.length + 1,
-      fileNumber: newCase.fileNumber || generateFileNumber(),
-      caseNumber: newCase.caseNo || generateCaseNumber(),
-      title: newCase.title,
-      client: newCase.client,
-      type: newCase.type,
-      status: newCase.status,
-      priority: newCase.priority as 'high' | 'medium' | 'low',
-      assignedTo: newCase.assignedTo, // Will be current user (uneditable)
-      dateOpened: newCase.dateOpened,
-      deadline: newCase.deadline,
-      budget: 0,
-      description: newCase.description,
-      addedBy: 'current-user',
-      addedDate: formatDateDisplay(newCase.dateOpened)
-    };
+    try {
+      const caseData: CreateCaseData = {
+        file_number: newCase.file_number || await generateFileNumber(),
+        case_number: newCase.case_number || await generateCaseNumber(),
+        title: newCase.title,
+        client_id: newCase.client_id,
+        case_type: newCase.case_type,
+        status: newCase.status as 'Active' | 'On Hold' | 'Closed',
+        priority: newCase.priority as 'low' | 'medium' | 'high',
+        assigned_to_user_id: newCase.assigned_to_user_id,
+        deadline: newCase.deadline,
+        description: newCase.description,
+      };
 
-    setCases([...cases, newCaseObj]);
-    resetNewCaseForm();
-    setShowAddCaseForm(false);
+      const response = await apiRequest<Case>(`/api/cases`, {
+        method: 'POST',
+        body: JSON.stringify(caseData),
+      });
+
+      if (response.data) {
+        setCases([...cases, response.data]);
+        resetNewCaseForm();
+        setShowAddCaseForm(false);
+        fetchData(); // Refresh data
+      } else if (response.error) {
+        alert(`Error adding case: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding case:', error);
+      alert('Failed to add case. Please try again.');
+    }
   };
 
-  const handleDeleteCase = (id: number) => {
+  const handleDeleteCase = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this case?')) {
-      setCases(cases.filter(c => c.id !== id));
-      if (selectedCase === id) {
-        setSelectedCase(null);
+      try {
+        const response = await apiRequest(`/api/cases/${id}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.error) {
+          setCases(cases.filter(c => c.id !== id));
+          if (selectedCase === id) {
+            setSelectedCase(null);
+          }
+          fetchData(); // Refresh data
+        } else {
+          alert(`Error deleting case: ${response.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting case:', error);
+        alert('Failed to delete case. Please try again.');
       }
     }
   };
 
-  const handleEditCase = () => {
+  const handleEditCase = async () => {
     if (!selectedCaseData || !editingCase) return;
 
-    const updatedCases = cases.map(c => {
-      if (c.id === editingCase) {
-        return {
-          ...c,
-          fileNumber: newCase.fileNumber || c.fileNumber,
-          caseNumber: newCase.caseNo || c.caseNumber,
-          title: newCase.title || c.title,
-          client: newCase.client || c.client,
-          type: newCase.type || c.type,
-          status: newCase.status || c.status,
-          priority: newCase.priority as 'high' | 'medium' | 'low',
-          description: newCase.description || c.description,
-          deadline: newCase.deadline || c.deadline,
-        };
-      }
-      return c;
-    });
+    try {
+      const updateData: UpdateCaseData = {
+        title: newCase.title || selectedCaseData.title,
+        client_id: newCase.client_id || selectedCaseData.client_id,
+        case_type: newCase.case_type || selectedCaseData.case_type,
+        status: newCase.status as 'Active' | 'On Hold' | 'Closed' || selectedCaseData.status,
+        priority: newCase.priority as 'low' | 'medium' | 'high' || selectedCaseData.priority,
+        assigned_to_user_id: newCase.assigned_to_user_id || selectedCaseData.assigned_to_user_id,
+        deadline: newCase.deadline || selectedCaseData.deadline || '',
+        description: newCase.description || selectedCaseData.description || '',
+      };
 
-    setCases(updatedCases);
-    resetNewCaseForm();
-    setEditingCase(null);
+      const response = await apiRequest<Case>(`/api/cases/${editingCase}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.data) {
+        const updatedCases = cases.map(c => 
+          c.id === editingCase ? response.data! : c
+        );
+        setCases(updatedCases);
+        resetNewCaseForm();
+        setEditingCase(null);
+        fetchData(); // Refresh data
+      } else if (response.error) {
+        alert(`Error updating case: ${response.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating case:', error);
+      alert('Failed to update case. Please try again.');
+    }
   };
 
   const resetNewCaseForm = () => {
     setNewCase({
-      fileNumber: '',
-      caseNo: '',
+      file_number: '',
+      case_number: '',
       title: '',
-      client: '',
-      type: '',
+      client_id: 0,
+      case_type: '',
       status: 'Active',
       priority: 'medium',
-      assignedTo: currentUser, 
+      assigned_to_user_id: currentUser?.id || 0,
       description: '',
-      dateOpened: getTodayDate(),
       deadline: getDefaultDeadline(),
-      addedBy: '',
     });
   };
 
-  const startEditing = (caseItem: any) => {
+  const startEditing = (caseItem: Case) => {
     setEditingCase(caseItem.id);
     setNewCase({
-      fileNumber: caseItem.fileNumber,
-      caseNo: caseItem.caseNumber,
+      file_number: caseItem.file_number,
+      case_number: caseItem.case_number,
       title: caseItem.title,
-      client: caseItem.client,
-      type: caseItem.type,
+      client_id: caseItem.client_id,
+      case_type: caseItem.case_type,
       status: caseItem.status,
       priority: caseItem.priority,
-      assignedTo: caseItem.assignedTo, // Keep existing assignment
-      description: caseItem.description,
-      dateOpened: caseItem.dateOpened, // Keep existing date opened
-      deadline: caseItem.deadline, // Keep existing deadline
-      addedBy: caseItem.addedBy,
+      assigned_to_user_id: caseItem.assigned_to_user_id,
+      description: caseItem.description || '',
+      deadline: caseItem.deadline || getDefaultDeadline(),
     });
   };
 
@@ -312,52 +392,156 @@ export function AssociateCases() {
     'Immigration'
   ];
 
+  const getClientName = (clientId: number) => {
+    const client = clients.find(c => c.id === clientId);
+    return client?.name || 'Unknown Client';
+  };
+
+  const getAssignedUserName = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    return user?.full_name || 'Unknown User';
+  };
+
+  // Calculate statistics
+  const myCasesCount = cases.filter(c => 
+    c.assigned_to_user_id === currentUser?.id || c.added_by_user_id === currentUser?.id
+  ).length;
+
+  const activeMyCasesCount = cases.filter(c => 
+    (c.assigned_to_user_id === currentUser?.id || c.added_by_user_id === currentUser?.id) && 
+    c.status === 'Active'
+  ).length;
+
+  const highPriorityMyCasesCount = cases.filter(c => 
+    (c.assigned_to_user_id === currentUser?.id || c.added_by_user_id === currentUser?.id) && 
+    c.priority === 'high'
+  ).length;
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 space-y-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-foreground mb-2">Cases</h1>
+            <p className="text-muted-foreground">Loading cases...</p>
+          </div>
+        </div>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading cases...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-foreground mb-2">My Cases</h1>
-          <p className="text-muted-foreground">Cases managed by you</p>
+          <h1 className="text-foreground mb-2">Cases</h1>
+          <p className="text-muted-foreground">
+            {viewMode === 'my-cases' ? 'Cases assigned to or created by you' : 'All cases in the company'}
+          </p>
         </div>
-        <Button 
-          onClick={() => setShowAddCaseForm(true)}
-          className="gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Case
-        </Button>
+        <div className="flex items-center gap-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+            <Button
+              variant={viewMode === 'my-cases' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('my-cases')}
+              className="gap-2"
+            >
+              <Eye className="w-4 h-4" />
+              My Cases
+            </Button>
+            <Button
+              variant={viewMode === 'all-cases' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('all-cases')}
+              className="gap-2"
+            >
+              <Building className="w-4 h-4" />
+              All Cases
+            </Button>
+          </div>
+          <Button 
+            onClick={() => setShowAddCaseForm(true)}
+            className="gap-2"
+            disabled={clients.length === 0}
+          >
+            <Plus className="w-4 h-4" />
+            Add Case
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">My Cases</p>
-            <p className="text-2xl font-semibold text-foreground">{userCases.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">Active Cases</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              {viewMode === 'my-cases' ? 'My Cases' : 'Total Cases'}
+            </p>
             <p className="text-2xl font-semibold text-foreground">
-              {userCases.filter(c => c.status === 'Active').length}
+              {viewMode === 'my-cases' ? myCasesCount : cases.length}
+            </p>
+            <div className="flex items-center gap-1 mt-2">
+              {viewMode === 'my-cases' ? (
+                <Eye className="w-3 h-3 text-muted-foreground" />
+              ) : (
+                <Building className="w-3 h-3 text-muted-foreground" />
+              )}
+              <span className="text-xs text-muted-foreground">
+                {viewMode === 'my-cases' ? 'Personal view' : 'Company view'}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground mb-1">
+              {viewMode === 'my-cases' ? 'My Active Cases' : 'Active Cases'}
+            </p>
+            <p className="text-2xl font-semibold text-foreground">
+              {viewMode === 'my-cases' 
+                ? activeMyCasesCount
+                : cases.filter(c => c.status === 'Active').length
+              }
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">High Priority</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              {viewMode === 'my-cases' ? 'My High Priority' : 'High Priority'}
+            </p>
             <p className="text-2xl font-semibold text-destructive">
-              {userCases.filter(c => c.priority === 'high').length}
+              {viewMode === 'my-cases'
+                ? highPriorityMyCasesCount
+                : cases.filter(c => c.priority === 'high').length
+              }
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground mb-1">Assigned to Me</p>
-            <p className="text-2xl font-semibold text-primary">
-              {cases.filter(c => c.assignedTo === currentUser).length}
-            </p>
+            <p className="text-sm text-muted-foreground mb-1">My Assigned Clients</p>
+            <p className="text-2xl font-semibold text-primary">{clients.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm text-muted-foreground mb-1">Currently Viewing</p>
+            <p className="text-2xl font-semibold text-accent">{filteredCases.length}</p>
+            <div className="flex items-center gap-1 mt-2">
+              <Filter className="w-3 h-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                {filterStatus !== 'all' || filterPriority !== 'all' || searchQuery ? 'Filtered' : 'All'}
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -370,7 +554,7 @@ export function AssociateCases() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search my cases by title, case number, or client..."
+                placeholder={`Search ${viewMode === 'my-cases' ? 'my' : 'all'} cases by title, case number, or client...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
@@ -387,7 +571,6 @@ export function AssociateCases() {
                 <option value="Active">Active</option>
                 <option value="On Hold">On Hold</option>
                 <option value="Closed">Closed</option>
-                <option value="Archived">Archived</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -402,6 +585,17 @@ export function AssociateCases() {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">View:</span>
+              <Badge variant="default">
+                {viewMode === 'my-cases' ? 'My Cases Only' : 'All Company Cases'}
+              </Badge>
+            </div>
+            <div className="text-muted-foreground">
+              Showing {filteredCases.length} of {viewMode === 'my-cases' ? myCasesCount : cases.length} cases
             </div>
           </div>
         </CardContent>
@@ -437,8 +631,8 @@ export function AssociateCases() {
                   </label>
                   <input
                     type="text"
-                    value={newCase.fileNumber}
-                    onChange={(e) => setNewCase({...newCase, fileNumber: e.target.value})}
+                    value={newCase.file_number}
+                    onChange={(e) => setNewCase({...newCase, file_number: e.target.value})}
                     className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="FN-2026-EST-001"
                   />
@@ -453,8 +647,8 @@ export function AssociateCases() {
                   </label>
                   <input
                     type="text"
-                    value={newCase.caseNo}
-                    onChange={(e) => setNewCase({...newCase, caseNo: e.target.value})}
+                    value={newCase.case_number}
+                    onChange={(e) => setNewCase({...newCase, case_number: e.target.value})}
                     className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="CAS-2026-001"
                   />
@@ -476,17 +670,27 @@ export function AssociateCases() {
                   />
                 </div>
                 
-                {/* Client */}
+                {/* Client - Only show clients assigned to current user */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Client *</label>
-                  <input
-                    type="text"
-                    value={newCase.client}
-                    onChange={(e) => setNewCase({...newCase, client: e.target.value})}
+                  <select
+                    value={newCase.client_id}
+                    onChange={(e) => setNewCase({...newCase, client_id: parseInt(e.target.value)})}
                     className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Enter client name"
                     required
-                  />
+                  >
+                    <option value="0">Select client...</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name} {client.company ? `(${client.company})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {clients.length === 0 && (
+                    <p className="text-xs text-destructive">
+                      No clients assigned to you. Please contact an admin to assign clients.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -498,8 +702,8 @@ export function AssociateCases() {
                     Case Type *
                   </label>
                   <select
-                    value={newCase.type}
-                    onChange={(e) => setNewCase({...newCase, type: e.target.value})}
+                    value={newCase.case_type}
+                    onChange={(e) => setNewCase({...newCase, case_type: e.target.value})}
                     className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     required
                   >
@@ -521,7 +725,6 @@ export function AssociateCases() {
                     <option value="Active">Active</option>
                     <option value="On Hold">On Hold</option>
                     <option value="Closed">Closed</option>
-                    <option value="Archived">Archived</option>
                   </select>
                 </div>
                 
@@ -541,37 +744,28 @@ export function AssociateCases() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Assigned To */}
+                {/* Assigned To - Can assign to any associate */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Users className="w-4 h-4" />
                     Assigned To
                   </label>
-                  <input
-                    type="text"
-                    value={newCase.assignedTo}
-                    readOnly
-                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring cursor-not-allowed bg-muted/30"
-                  />
+                  <select
+                    value={newCase.assigned_to_user_id}
+                    onChange={(e) => setNewCase({...newCase, assigned_to_user_id: parseInt(e.target.value)})}
+                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value={currentUser?.id || 0}>Myself ({currentUser?.full_name || 'You'})</option>
+                    {users.map((user) => (
+                      user.id !== currentUser?.id && (
+                        <option key={user.id} value={user.id}>
+                          {user.full_name} ({user.role})
+                        </option>
+                      )
+                    ))}
+                  </select>
                   <p className="text-xs text-muted-foreground">
-                    {!editingCase ? "Automatically assigned to you" : "Assignment cannot be changed"}
-                  </p>
-                </div>
-                
-                {/* Date Opened */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4" />
-                    Date Opened
-                  </label>
-                  <input
-                    type="date"
-                    value={newCase.dateOpened}
-                    readOnly
-                    className="w-full px-3 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring cursor-not-allowed bg-muted/30"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {!editingCase ? "Set to today's date" : "Original opening date"}
+                    Assign case to yourself or another associate
                   </p>
                 </div>
                 
@@ -616,6 +810,7 @@ export function AssociateCases() {
                 <Button 
                   onClick={editingCase ? handleEditCase : handleAddCase}
                   className="gap-2"
+                  disabled={!newCase.client_id}
                 >
                   {editingCase ? 'Save Changes' : 'Add Case'}
                 </Button>
@@ -632,7 +827,7 @@ export function AssociateCases() {
           <Card>
             <CardHeader>
               <CardTitle>
-                My Cases ({filteredCases.length})
+                {viewMode === 'my-cases' ? 'My Cases' : 'All Cases'} ({filteredCases.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -643,9 +838,13 @@ export function AssociateCases() {
                   <p className="text-muted-foreground mb-4">
                     {searchQuery || filterStatus !== 'all' || filterPriority !== 'all'
                       ? 'Try adjusting your search or filter' 
-                      : 'Get started by adding your first case'}
+                      : (viewMode === 'my-cases' && clients.length === 0
+                        ? 'You have no assigned clients. Contact an admin to get clients assigned to you.'
+                        : viewMode === 'my-cases'
+                        ? 'No cases assigned to or created by you'
+                        : 'No cases in the company yet')}
                   </p>
-                  {!searchQuery && filterStatus === 'all' && filterPriority === 'all' && (
+                  {!searchQuery && filterStatus === 'all' && filterPriority === 'all' && clients.length > 0 && viewMode === 'my-cases' && (
                     <Button 
                       onClick={() => setShowAddCaseForm(true)}
                       variant="outline"
@@ -657,7 +856,7 @@ export function AssociateCases() {
                   )}
                 </div>
               ) : (
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
                   {filteredCases.map((caseItem) => (
                     <button
                       key={caseItem.id}
@@ -681,13 +880,16 @@ export function AssociateCases() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mb-1">
-                            {caseItem.fileNumber} • {caseItem.client}
+                            {caseItem.file_number} • {caseItem.client_name || 'Unknown Client'}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {caseItem.caseNumber} • {caseItem.type}
+                            {caseItem.case_number} • {caseItem.case_type}
                           </p>
-                          {caseItem.addedBy === 'current-user' && (
-                            <p className="text-xs text-primary mt-1">Managed by you</p>
+                          {(caseItem.added_by_user_id === currentUser?.id || caseItem.assigned_to_user_id === currentUser?.id) && (
+                            <p className="text-xs text-primary mt-1">
+                              {caseItem.added_by_user_id === currentUser?.id ? 'Created by you' : 
+                               caseItem.assigned_to_user_id === currentUser?.id ? 'Assigned to you' : ''}
+                            </p>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -705,16 +907,28 @@ export function AssociateCases() {
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                         <div className="flex items-center gap-2">
                           <Users className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">Assigned: {caseItem.assignedTo}</span>
+                          <span className="text-muted-foreground">
+                            {caseItem.assigned_to_name || getAssignedUserName(caseItem.assigned_to_user_id)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">Opened: {formatDateDisplay(caseItem.dateOpened)}</span>
+                          <span className="text-muted-foreground">Opened: {formatDateDisplay(caseItem.date_opened)}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">Due: {formatDateDisplay(caseItem.deadline)}</span>
-                        </div>
+                        {caseItem.deadline && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Due: {formatDateDisplay(caseItem.deadline)}</span>
+                          </div>
+                        )}
+                        {viewMode === 'all-cases' && (caseItem.added_by_user_id === currentUser?.id || caseItem.assigned_to_user_id === currentUser?.id) && (
+                          <div className="col-span-2 flex items-center gap-2">
+                            <span className="text-xs text-primary">
+                              {caseItem.added_by_user_id === currentUser?.id ? 'Created by you' : 
+                               caseItem.assigned_to_user_id === currentUser?.id ? 'Assigned to you' : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -749,20 +963,20 @@ export function AssociateCases() {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                      <span>{selectedCaseData.caseNumber}</span>
+                      <span>{selectedCaseData.case_number}</span>
                       <span>•</span>
-                      <span>{selectedCaseData.fileNumber}</span>
+                      <span>{selectedCaseData.file_number}</span>
                       <span>•</span>
-                      <span>{selectedCaseData.type}</span>
+                      <span>{selectedCaseData.case_type}</span>
                     </div>
-                    {selectedCaseData.addedBy === 'current-user' && (
+                    {(selectedCaseData.added_by_user_id === currentUser?.id || selectedCaseData.assigned_to_user_id === currentUser?.id) && (
                       <Badge variant="default" className="mt-2">
-                        Managed by You
+                        {selectedCaseData.added_by_user_id === currentUser?.id ? 'Created by You' : 'Assigned to You'}
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {selectedCaseData.addedBy === 'current-user' && (
+                    {(selectedCaseData.added_by_user_id === currentUser?.id || selectedCaseData.assigned_to_user_id === currentUser?.id) && (
                       <>
                         <Button 
                           variant="ghost" 
@@ -795,52 +1009,63 @@ export function AssociateCases() {
                   {/* Overview */}
                   <div>
                     <h3 className="text-sm font-medium text-foreground mb-3">Case Overview</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{selectedCaseData.description}</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {selectedCaseData.description || 'No description provided.'}
+                    </p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Client</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.client}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {selectedCaseData.client_name || getClientName(selectedCaseData.client_id)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Assigned To</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.assignedTo}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {selectedCaseData.assigned_to_name || getAssignedUserName(selectedCaseData.assigned_to_user_id)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Case Type</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.type}</p>
+                        <p className="text-sm font-medium text-foreground">{selectedCaseData.case_type}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Date Opened</p>
-                        <p className="text-sm font-medium text-foreground">{formatDateDisplay(selectedCaseData.dateOpened)}</p>
+                        <p className="text-sm font-medium text-foreground">{formatDateDisplay(selectedCaseData.date_opened)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">File Number</p>
-                        <p className="text-sm font-medium text-foreground">{selectedCaseData.fileNumber}</p>
+                        <p className="text-sm font-medium text-foreground">{selectedCaseData.file_number}</p>
                       </div>
+                      {selectedCaseData.deadline && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Deadline</p>
+                          <p className="text-sm font-medium text-foreground">{formatDateDisplay(selectedCaseData.deadline)}</p>
+                        </div>
+                      )}
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Deadline</p>
-                        <p className="text-sm font-medium text-foreground">{formatDateDisplay(selectedCaseData.deadline)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Added By</p>
+                        <p className="text-xs text-muted-foreground mb-1">Created By</p>
                         <p className="text-sm font-medium text-foreground">
-                          {selectedCaseData.addedBy === 'current-user' ? 'You' : 'Another Associate'}
+                          {selectedCaseData.added_by_user_id === currentUser?.id ? 'You' : 
+                           (selectedCaseData.added_by_name || getAssignedUserName(selectedCaseData.added_by_user_id))}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="flex gap-2 pt-4 border-t border-border">
-                    <Button variant="outline" className="gap-2">
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
+                    <Button variant="outline" className="gap-2" onClick={() => onNavigate('documents')}>
                       <FileText className="w-4 h-4" />
                       View Documents
+                      <ExternalLink className="w-3 h-3" />
                     </Button>
-                    <Button variant="outline" className="gap-2">
+                    <Button variant="outline" className="gap-2" onClick={() => onNavigate('notes')}>
                       <MessageSquare className="w-4 h-4" />
                       Add Note
+                      <ExternalLink className="w-3 h-3" />
                     </Button>
-                    {selectedCaseData.addedBy === 'current-user' && (
+                    {(selectedCaseData.added_by_user_id === currentUser?.id || selectedCaseData.assigned_to_user_id === currentUser?.id) && (
                       <Button 
                         variant="outline" 
                         className="gap-2"
@@ -853,6 +1078,121 @@ export function AssociateCases() {
                   </div>
                 </div>
               </CardContent>
+            </Card>
+
+            {/* Case Notes Section */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="w-5 h-5 text-primary" />
+                    <CardTitle>Case Notes</CardTitle>
+                    <Badge variant="default" className="ml-2">
+                      {caseNotes.length}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowNotes(!showNotes)}
+                    className="gap-1"
+                  >
+                    {showNotes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {showNotes ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
+              </CardHeader>
+              
+              {showNotes && (
+                <CardContent>
+                  {loadingNotes ? (
+                    <div className="py-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-sm text-muted-foreground">Loading notes...</p>
+                    </div>
+                  ) : caseNotes.length === 0 ? (
+                    <div className="text-center py-8">
+                      <StickyNote className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-foreground mb-1">No notes yet</p>
+                      <p className="text-sm text-muted-foreground mb-4">Add your first note to this case</p>
+                      <Button variant="outline" className="gap-2" onClick={() => onNavigate('notes')}>
+                        <Plus className="w-4 h-4" />
+                        Add Note
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm text-muted-foreground">
+                          Showing {caseNotes.length} note{caseNotes.length !== 1 ? 's' : ''}
+                        </p>
+                        <Button variant="outline" size="sm" onClick={() => onNavigate('notes')} className="gap-1">
+                          <Plus className="w-3 h-3" />
+                          Add Note
+                        </Button>
+                      </div>
+                      
+                      <div className="divide-y divide-border">
+                        {caseNotes.map((note) => (
+                          <div key={note.id} className="py-4">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <h4 className="text-sm font-medium text-foreground mb-1">{note.title}</h4>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="default" className="text-xs">
+                                    {note.category || 'Uncategorized'}
+                                  </Badge>
+                                  {note.is_private && (
+                                    <Badge variant="secondary" className="text-xs">Private</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDateTime(note.updated_at)}
+                              </span>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                              {note.content}
+                            </p>
+                            
+                            {note.tags && note.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-3">
+                                {note.tags.map((tag, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2 py-0.5 bg-muted rounded text-xs text-muted-foreground"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <div className="flex items-center gap-4">
+                                <span>Words: {note.word_count || 0}</span>
+                                <span>Chars: {note.character_count || 0}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="pt-4 border-t border-border">
+                        <Button 
+                          variant="outline" 
+                          className="w-full gap-2"
+                          onClick={() => onNavigate('notes')}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Add New Note to This Case
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              )}
             </Card>
           </div>
         )}

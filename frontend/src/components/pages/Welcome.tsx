@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Buttons';
 import { Card, CardContent } from '../ui/Cards';
 import dolamo from '../../assets/law.png';
@@ -11,10 +12,6 @@ import {
   ArrowRight,
   Briefcase
 } from 'lucide-react';
-
-interface WelcomeProps {
-  onGetStarted: () => void;
-}
 
 const features = [
   {
@@ -58,7 +55,46 @@ const benefits = [
   'Mobile-responsive access'
 ];
 
-export function Welcome({ onGetStarted }: WelcomeProps) {
+const useToast = () => {
+   const toast = (options: { title: string, description: string, variant?: string }) => {
+     if (options.variant === 'destructive') {
+       alert(`Error: ${options.title}\n${options.description}`);
+     } else {
+       alert(`Success: ${options.title}\n${options.description}`);
+     }
+   };
+   return { toast };
+ };
+
+export function Welcome() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleGetStarted = () => {
+      navigate('/login');
+  };
+
+  const handlePrivacyPolicy = () => {
+    toast({
+      title: 'Privacy Policy',
+      description: 'Privacy policy details coming soon.',
+    });
+  };
+
+  const handleTermsOfService = () => {
+    toast({
+      title: 'Terms of Service',
+      description: 'Terms of service details coming soon.',
+    });
+  };
+
+  const handleContactSupport = () => {
+    toast({
+      title: 'Contact Support',
+      description: 'Please contact support@standfirm.com for assistance.',
+    });
+  };
+
   return (
     <div className="min-h-screen bg-cover bg-center bg-no-repeat absolute inset-0 bg-gradient-to-br from-white/70 via-white/60 to-white/50"
       style={{ backgroundImage: `url(${dolamo})` }}>
@@ -71,7 +107,6 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
                 <Shield className="w-9 h-9 text-white" />
               </div>
               <h1 className="text-4xl lg:text-5xl font-bold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">Stand Firm</h1>
-
             </div>
             <p className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent mb-4">
               Professional Legal Client Management
@@ -85,7 +120,7 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                onClick={onGetStarted}
+                onClick={handleGetStarted}
                 className="gap-2 text-base px-8 py-3 text-white 
              bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600
              hover:from-yellow-400 hover:via-amber-500 hover:to-yellow-700
@@ -99,7 +134,6 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
         </div>
       </div>
 
-
       {/* Features Grid */}
       <div className="max-w-7xl mx-auto px-6 py-16 lg:py-24">
         <div className="text-center mb-12">
@@ -112,7 +146,6 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
             Everything your law firm needs to operate efficiently and serve clients with excellence
           </p>
         </div>
-
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
           {features.map((feature) => {
@@ -182,7 +215,7 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
           </p>
           <Button
             size="lg"
-            onClick={onGetStarted}
+            onClick={handleGetStarted}
             className="gap-2 text-base px-8 py-3 text-white 
              bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600
              hover:from-yellow-400 hover:via-amber-500 hover:to-yellow-700
@@ -191,7 +224,6 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
             Get Started Today
             <ArrowRight className="w-5 h-5" />
           </Button>
-
         </div>
       </div>
 
@@ -204,9 +236,24 @@ export function Welcome({ onGetStarted }: WelcomeProps) {
               <span className="text-sm text-muted-foreground">© 2026 Stand Firm. All rights reserved.</span>
             </div>
             <div className="flex gap-6 text-sm text-muted-foreground">
-              <button className="hover:text-foreground transition-colors">Privacy Policy</button>
-              <button className="hover:text-foreground transition-colors">Terms of Service</button>
-              <button className="hover:text-foreground transition-colors">Contact Support</button>
+              <button 
+                onClick={handlePrivacyPolicy}
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </button>
+              <button 
+                onClick={handleTermsOfService}
+                className="hover:text-foreground transition-colors"
+              >
+                Terms of Service
+              </button>
+              <button 
+                onClick={handleContactSupport}
+                className="hover:text-foreground transition-colors"
+              >
+                Contact Support
+              </button>
             </div>
           </div>
         </div>

@@ -1,0 +1,28 @@
+{
+  "name": "legal-client-management-communication-hub",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "npm --prefix backend start",
+    "client": "npm --prefix frontend run dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Thabiso-Motha17/Legal-Client-Management-Communication-Hub.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Thabiso-Motha17/Legal-Client-Management-Communication-Hub/issues"
+  },
+  "homepage": "https://github.com/Thabiso-Motha17/Legal-Client-Management-Communication-Hub#readme",
+  "dependencies": {
+    "concurrently": "^9.2.1",
+    "react-router-dom": "^7.12.0"
+  }
+}
