@@ -75,6 +75,10 @@ const AdminLayout = () => {
     localStorage.removeItem('user');
     window.location.href = '/';
   };
+  if(currentPage)
+  {
+    console.log('');
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
