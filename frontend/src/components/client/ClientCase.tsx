@@ -68,6 +68,7 @@ export function ClientCases() {
       // Get current user
       const meData = await authService.getMe();
       if (meData?.user) {
+        currentUser
         setCurrentUser(meData.user);
       }
 
@@ -262,6 +263,7 @@ export function ClientCases() {
       { title: 'Final Review', completed: caseData.progress ? caseData.progress > 80 : false },
       { title: 'Case Closure', completed: caseData.status === 'Closed' }
     ]);
+    setMilestones
 
     const caseDetails = {
       ...caseData,

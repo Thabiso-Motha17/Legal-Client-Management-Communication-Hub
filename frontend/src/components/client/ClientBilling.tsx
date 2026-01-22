@@ -54,6 +54,7 @@ export function ClientBilling() {
       // Get current user
       const meData = await authService.getMe();
       if (meData?.user) {
+        currentUser
         setCurrentUser(meData.user);
       }
 
@@ -246,7 +247,7 @@ export function ClientBilling() {
     try {
       // In a real app, you would have a download endpoint
       // For now, we'll just show an alert
-      alert(`Downloading invoice ${invoiceNumber}`);
+      alert(`Downloading invoice ${invoiceId} ${invoiceNumber}`);
       // You would typically do: window.open(`/api/invoices/${invoiceId}/download`, '_blank');
     } catch (err) {
       alert('Failed to download invoice');

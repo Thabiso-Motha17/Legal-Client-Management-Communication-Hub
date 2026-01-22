@@ -451,24 +451,33 @@ app.delete('/api/law-firms/:id', authenticateToken, async (req, res) => {
 app.get('/api/users', authenticateToken, async (req, res) => {
   try {
     let query = `
-      SELECT id, username, email, full_name, role, law_firm_id, 
-             phone, is_active, last_login_at, created_at, updated_at, permissions
-      FROM users 
+      SELECT 
+        u.id, u.username, u.email, u.full_name, u.role, 
+        u.law_firm_id, u.phone, u.is_active, u.last_login_at, 
+        u.created_at, u.updated_at, u.permissions,
+        lf.name as law_firm_name
+      FROM users u
+      LEFT JOIN law_firms lf ON u.law_firm_id = lf.id
       WHERE 1=1
     `;
     const params = [];
 
-    // Admin/Associate can only see users from their law firm
-    if (req.user.role === 'admin' || req.user.role === 'associate') {
-      query += ' AND law_firm_id = $1';
+    // Admins can see all users in the system
+    if (req.user.role === 'admin') {
+      // No filter for admins - they can see all users
+    } 
+    // Associates can only see users from their law firm
+    else if (req.user.role === 'associate') {
+      query += ' AND u.law_firm_id = $1';
       params.push(req.user.lawFirmId);
-    } else if (req.user.role === 'client') {
-      // Clients can only see themselves
-      query += ' AND id = $1';
+    } 
+    // Clients can only see themselves
+    else if (req.user.role === 'client') {
+      query += ' AND u.id = $1';
       params.push(req.user.id);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY u.created_at DESC';
 
     const result = await pool.query(query, params);
     

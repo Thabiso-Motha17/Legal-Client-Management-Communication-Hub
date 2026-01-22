@@ -47,19 +47,6 @@ interface RecentSignup {
   plan: string;
 }
 
-interface DashboardStats {
-  totalCompanies: number;
-  totalAttorneys: number;
-  totalClients: number;
-  companiesGrowth: number;
-  attorneysGrowth: number;
-  clientsGrowth: number;
-  recentSignups: RecentSignup[];
-  companyDistribution: CompanyDistributionData[];
-  monthlyGrowthData: MonthlyGrowthData[];
-  clientGrowthData: ClientGrowthData[];
-}
-
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({

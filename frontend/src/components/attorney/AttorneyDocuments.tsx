@@ -519,7 +519,6 @@ export function AssociateDocuments() {
       });
 
       if (response.ok) {
-        const result = await response.json();
         // Remove document from state
         setDocuments(documents.filter(doc => doc.id !== documentId));
         alert('Document deleted successfully!');

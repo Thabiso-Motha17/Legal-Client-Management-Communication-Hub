@@ -291,7 +291,7 @@ export function ClientDocuments() {
     try {
       await documentService.downloadDocument(id);
     } catch (err: any) {
-      alert(`Error downloading document: ${err.message}`);
+      alert(`Error downloading document:${name}: ${err.message} `);
     }
   };
 
@@ -321,7 +321,6 @@ export function ClientDocuments() {
 
   // Calculate statistics
   const clientDocuments = documents.filter(doc => doc.isClientUpload);
-  const attorneyDocuments = documents.filter(doc => !doc.isClientUpload);
   
   const stats = {
     totalDocuments: documents.length,

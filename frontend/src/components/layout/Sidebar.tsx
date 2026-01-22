@@ -2,20 +2,8 @@ import {
   LayoutDashboard, 
   Settings, 
   Users,
-  LogOut
 } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
-
-const useToast = () => {
-   const toast = (options: { title: string, description: string, variant?: string }) => {
-     if (options.variant === 'destructive') {
-       alert(`Error: ${options.title}\n${options.description}`);
-     } else {
-       alert(`Success: ${options.title}\n${options.description}`);
-     }
-   };
-   return { toast };
- };
+import { NavLink } from 'react-router-dom';
 
 interface SidebarProps {
   onLogout?: () => void;
@@ -43,32 +31,7 @@ const navigation = [
 ];
 
 export function Sidebar({ onLogout }: SidebarProps) {
-  const navigate = useNavigate();
-  const { toast } = useToast();
 
-  const handleLogout = () => {
-    // Clear authentication data
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
-    // Show logout message
-    toast({
-      title: 'Logged out',
-      description: 'You have been successfully logged out.',
-    });
-    
-    // Call onLogout prop if provided
-    if (onLogout) {
-      onLogout();
-    } else {
-      // Navigate to welcome page
-      navigate('/');
-    }
-  };
-
-  const handleProfile = () => {
-    navigate('/profile');
-  };
 
   const getCurrentUser = () => {
     const userStr = localStorage.getItem('user');
@@ -83,6 +46,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
   };
 
   const user = getCurrentUser();
+  onLogout
 
   return (
     <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-screen sticky top-0">

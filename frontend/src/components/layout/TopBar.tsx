@@ -1,4 +1,4 @@
-import { Search, Bell, User, ChevronDown, LogOut, Settings as SettingsIcon, Loader2 } from 'lucide-react';
+import { Search, Bell, User, ChevronDown, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../lib/api';
@@ -62,6 +62,7 @@ export function TopBar({ onNavigate, onLogout }: TopBarProps) {
     try {
       // This is a placeholder - implement actual notification endpoint
       // For now, we'll set a mock count
+      onNavigate
       setNotificationCount(2); // Mock data
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
