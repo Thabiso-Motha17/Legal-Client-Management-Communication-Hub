@@ -195,10 +195,6 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
     }
   };
 
-  const handleSignUp = () => {
-    // Navigate to signup page
-    navigate('/register');
-  };
 
   const currentConfig = roleConfig[role];
   const Icon = currentConfig.icon;
@@ -418,20 +414,6 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                     Change portal type
                   </button>
                 </p>
-                
-                <div className="text-center">
-                  <p className="text-sm text-stone-600 mb-2">
-                    Don't have an account?
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={handleSignUp}
-                    className="w-full border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                    disabled={loading}
-                  >
-                    Register as Client
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>

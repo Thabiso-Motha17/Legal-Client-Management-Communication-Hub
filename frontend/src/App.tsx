@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopBar } from './components/layout/TopBar';
-import { Welcome } from './components/pages/Welcome';
 import { Login } from './components/pages/Login';
 import { ClientLayout } from './components/client/ClientLayout';
 import { Dashboard } from './components/pages/Dashboard';
@@ -56,7 +55,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (allowedRoles.length > 0 && userRole && !allowedRoles.includes(userRole)) {
@@ -146,17 +145,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Welcome />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={
-          <div className="flex items-center justify-center h-screen">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-foreground mb-4">Registration</h1>
-              <p className="text-muted-foreground mb-6">Client registration should be initiated by your law firm.</p>
-              <p className="text-sm text-muted-foreground">Please contact your attorney or law firm administrator for access.</p>
-            </div>
-          </div>
-        } />
+        <Route path="/" element={<Login />} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={
