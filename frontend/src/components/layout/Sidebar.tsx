@@ -53,7 +53,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold tracking-tight bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
-          Stand Firm
+          Dolamo Attorneys
         </h1>
         <p className="text-stone-500 text-xs mt-1">Law Firm Management</p>
       </div>

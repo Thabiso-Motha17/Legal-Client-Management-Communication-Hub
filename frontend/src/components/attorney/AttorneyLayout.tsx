@@ -166,7 +166,7 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
                 </div>
                 <div>
                   <h2 className="text-sm font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent">
-                    Stand Firm
+                    Dolamo Attorneys
                   </h2>
                   <p className="text-xs text-stone-500">Associate Portal</p>
                 </div>
