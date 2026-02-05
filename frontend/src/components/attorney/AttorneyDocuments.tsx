@@ -56,7 +56,7 @@ export function AssociateDocuments() {
     file_size: number;
     file_type: string;
     mime_type: string;
-    year: number;
+    year: string | number;
   }>({
     name: '',
     case_id: 0,
@@ -884,7 +884,18 @@ export function AssociateDocuments() {
                     type="number"
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.year}
-                    onChange={(e) => setNewDocument({ ...newDocument, year: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Only allow 4-digit years (1000-9999)
+                      if (value === '' || (value.length <= 4 && /^\d+$/.test(value))) {
+                        setNewDocument({
+                          ...newDocument,
+                          year: value === '' ? '' : parseInt(value)
+                        });
+                      }
+                    }}
+                    max="9999"
+                    min="1000"
                   />
                 </div>
 
