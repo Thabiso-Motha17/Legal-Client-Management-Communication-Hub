@@ -1310,6 +1310,7 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
   try {
     let query = `
       SELECT d.*, 
+        d.year_column_name as year,
         u.full_name as uploaded_by_name,
         c.title as case_title,
         c.case_number,

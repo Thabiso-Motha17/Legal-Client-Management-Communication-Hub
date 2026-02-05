@@ -259,7 +259,6 @@ export function AssociateDocuments() {
         file_size: file.size,
         file_type: file.name.split('.').pop()?.toLowerCase() || '',
         mime_type: file.type,
-        year: 0,
       });
     } catch (error) {
       console.error('Error converting file to base64:', error);
@@ -886,7 +885,6 @@ export function AssociateDocuments() {
                     value={newDocument.year}
                     onChange={(e) => {
                       const value = e.target.value;
-                      // Only allow 4-digit years (1000-9999)
                       if (value === '' || (value.length <= 4 && /^\d+$/.test(value))) {
                         setNewDocument({
                           ...newDocument,
