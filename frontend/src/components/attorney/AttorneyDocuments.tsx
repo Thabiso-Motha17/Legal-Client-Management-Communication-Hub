@@ -1217,6 +1217,10 @@ export function AssociateDocuments() {
                             {doc.uploaded_by_name || 'Unknown'}
                           </span>
                         </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>{doc.year}</span>
+                        </div>
                         <div>
                           <span>{formatFileSize(doc.file_size)}</span>
                         </div>
