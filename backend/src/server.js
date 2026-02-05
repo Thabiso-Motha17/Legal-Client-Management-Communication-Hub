@@ -1377,11 +1377,11 @@ app.post('/api/documents', authenticateToken, async (req, res) => {
     const { 
       name, case_id, document_type, description, 
       version = 1, status = 'Draft',
-      file_data, file_name, file_size, file_type, mime_type
+      file_data, file_name, file_size, file_type, mime_type,year
     } = req.body;
 
     // Validate required fields
-    if (!name || !case_id || !document_type || !file_data || !file_name) {
+    if (!name || !case_id || !document_type || !file_data || !file_name || !year) {
       return res.status(400).json({ 
         error: 'Missing required fields',
         missing: {
@@ -1389,7 +1389,8 @@ app.post('/api/documents', authenticateToken, async (req, res) => {
           case_id: !case_id,
           document_type: !document_type,
           file_data: !file_data,
-          file_name: !file_name
+          file_name: !file_name,
+          year: !year
         }
       });
     }
@@ -1456,8 +1457,8 @@ app.post('/api/documents', authenticateToken, async (req, res) => {
       `INSERT INTO documents (
         name, case_id, document_type, description, version, status,
         law_firm_id, uploaded_by_user_id,
-        file_data, file_name, file_size, file_type, mime_type
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
+        file_data, file_name, file_size, file_type, mime_type,year_column_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,$14) 
        RETURNING *`,
       [
         name, 
@@ -1472,7 +1473,8 @@ app.post('/api/documents', authenticateToken, async (req, res) => {
         file_name,
         actualFileSize,
         finalFileType,
-        finalMimeType
+        finalMimeType,
+        year
       ]
     );
 

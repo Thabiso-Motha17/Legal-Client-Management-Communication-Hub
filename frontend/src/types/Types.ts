@@ -112,6 +112,7 @@ export interface Document {
   case_title?: string;
   file_number?: string;
   client_name?: string;
+  year?: number;
 }
 
 export interface Note {
@@ -291,6 +292,7 @@ export interface CreateDocumentData {
   file_size?: number;
   file_type?: string;
   mime_type?: string;
+  year?: number;
 }
 
 export interface UpdateDocumentData extends Partial<CreateDocumentData> {

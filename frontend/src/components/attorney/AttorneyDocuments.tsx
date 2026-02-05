@@ -56,6 +56,7 @@ export function AssociateDocuments() {
     file_size: number;
     file_type: string;
     mime_type: string;
+    year: number;
   }>({
     name: '',
     case_id: 0,
@@ -68,7 +69,8 @@ export function AssociateDocuments() {
     file_name: '',
     file_size: 0,
     file_type: '',
-    mime_type: ''
+    mime_type: '',
+    year: 0,
   });
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -244,10 +246,10 @@ export function AssociateDocuments() {
 
       // Convert file to base64
       const base64 = await convertFileToBase64(file);
-      
+
       // Set file name from the file if name is empty
       const documentName = newDocument.name || file.name.replace(/\.[^/.]+$/, ""); // Remove extension
-      
+
       setNewDocument({
         ...newDocument,
         name: documentName,
@@ -256,7 +258,8 @@ export function AssociateDocuments() {
         file_name: file.name,
         file_size: file.size,
         file_type: file.name.split('.').pop()?.toLowerCase() || '',
-        mime_type: file.type
+        mime_type: file.type,
+        year: 0,
       });
     } catch (error) {
       console.error('Error converting file to base64:', error);
@@ -299,7 +302,8 @@ export function AssociateDocuments() {
         file_name: newDocument.file_name,
         file_size: newDocument.file_size,
         file_type: newDocument.file_type,
-        mime_type: newDocument.mime_type
+        mime_type: newDocument.mime_type,
+        year: newDocument.year,
       };
 
       console.log('Uploading document:', {
@@ -352,9 +356,10 @@ export function AssociateDocuments() {
       file_name: '',
       file_size: 0,
       file_type: '',
-      mime_type: ''
+      mime_type: '',
+      year: 0,
     });
-    
+
     // Reset file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
     if (fileInput) {
@@ -370,9 +375,9 @@ export function AssociateDocuments() {
       // Check if it's a viewable file type
       const viewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'txt'];
       const fileExtension = document.file_name.split('.').pop()?.toLowerCase() || '';
-      const isViewable = viewableTypes.includes(fileExtension) || 
-                        document.mime_type?.includes('pdf') || 
-                        document.mime_type?.includes('image');
+      const isViewable = viewableTypes.includes(fileExtension) ||
+        document.mime_type?.includes('pdf') ||
+        document.mime_type?.includes('image');
 
       if (isViewable) {
         const token = localStorage.getItem('token');
@@ -397,7 +402,7 @@ export function AssociateDocuments() {
         } else {
           // For PDFs and other viewable files, open in new tab
           window.open(url, '_blank');
-          
+
           // Clean up URL after a delay
           setTimeout(() => {
             try {
@@ -456,7 +461,7 @@ export function AssociateDocuments() {
 
       // Get the blob from response
       const blob = await response.blob();
-      
+
       // Check if blob is valid
       if (blob.size === 0) {
         throw new Error('Received empty file');
@@ -464,11 +469,11 @@ export function AssociateDocuments() {
 
       // Check if it's a PDF by blob type or extension
       const isPDF = blob.type === 'application/pdf' || downloadFileName.toLowerCase().endsWith('.pdf');
-      
+
       // For PDFs, ask user if they want to open or download
       if (isPDF) {
         const userWantsToOpen = window.confirm('Do you want to open the PDF in a new tab instead of downloading?');
-        
+
         if (userWantsToOpen) {
           const url = window.URL.createObjectURL(blob);
           window.open(url, '_blank');
@@ -860,15 +865,27 @@ export function AssociateDocuments() {
 
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Document Name *</label>
-                  <input
-                    type="text"
+                  <select
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.name}
                     onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
-                    placeholder="Enter document name"
                     required
-                  />
+                  >
+                    <option value="">Select document type</option>
+                    <option value="Payment to sheriff">Payment to sheriff</option>
+                    <option value="Payment from Client">Payment from Client</option>
+                  </select>
                   <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">Year:</label>
+                  <input
+                    type="number"
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={newDocument.year}
+                    onChange={(e) => setNewDocument({ ...newDocument, year: parseInt(e.target.value) || 0 })}
+                  />
                 </div>
 
                 <div>
@@ -1037,7 +1054,7 @@ export function AssociateDocuments() {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Version</label>
                   <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    v{viewingDocument.version}
+                    {viewingDocument.version}
                   </div>
                 </div>
 
@@ -1045,6 +1062,13 @@ export function AssociateDocuments() {
                   <label className="block text-sm font-medium text-foreground mb-1">Uploaded By</label>
                   <div className="px-3 py-2 bg-input-background rounded border border-border">
                     {viewingDocument.uploaded_by_name || 'Unknown'}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Year:</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">
+                    {viewingDocument.year || 'Unknown'}
                   </div>
                 </div>
 

@@ -125,6 +125,7 @@ CREATE TABLE documents (
   description TEXT,
   version INTEGER DEFAULT 1,
   status VARCHAR(50) DEFAULT 'Draft',
+  year_column_name INTEGER,
   law_firm_id INTEGER REFERENCES law_firms(id),
   uploaded_by_user_id INTEGER REFERENCES users(id),
   reviewer_user_id INTEGER REFERENCES users(id),
