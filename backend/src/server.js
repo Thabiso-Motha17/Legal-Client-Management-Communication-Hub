@@ -1355,6 +1355,12 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
       paramIndex++;
     }
 
+    if( req.query.year) {
+      query += ` AND d.year = $${paramIndex}`;
+      params.push(req.query.year);
+      paramIndex++;
+    }
+
     query += ' ORDER BY d.uploaded_at DESC';
 
     console.log('Executing documents query:', query, params);
