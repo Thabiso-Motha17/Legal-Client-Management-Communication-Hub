@@ -1356,7 +1356,7 @@ app.get('/api/documents', authenticateToken, async (req, res) => {
     }
 
     if( req.query.year) {
-      query += ` AND d.year = $${paramIndex}`;
+      query += ` AND d.year_column_name = $${paramIndex}`;
       params.push(req.query.year);
       paramIndex++;
     }
