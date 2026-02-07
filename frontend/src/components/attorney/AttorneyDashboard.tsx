@@ -816,7 +816,7 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2" 
-                onClick={() => onNavigate('events')}
+                onClick={() => onNavigate('calendar')}
               >
                 <Calendar className="w-4 h-4" />
                 Calendar & Events
