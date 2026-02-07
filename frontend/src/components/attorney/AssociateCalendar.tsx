@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
 import { Calendar } from '../ui/calendar';
+import { API_URL } from '../../api';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -146,7 +147,7 @@ export function AssociateCalendar() {
         // Could implement server-side month filtering if needed
       }
 
-      const response = await fetch(`/api/events?${params.toString()}`, {
+      const response = await fetch(`${API_URL}/api/events?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -174,7 +175,7 @@ export function AssociateCalendar() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('/api/cases', {
+      const response = await fetch(`${API_URL}/api/cases`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export function AssociateCalendar() {
         return;
       }
 
-      const response = await fetch('/api/events', {
+      const response = await fetch(`${API_URL}/api/events`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -344,7 +345,7 @@ export function AssociateCalendar() {
         document_id: editingEvent.document_id,
       };
 
-      const response = await fetch(`/api/events/${editingEvent.id}`, {
+      const response = await fetch(`${API_URL}/api/events/${editingEvent.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -384,7 +385,7 @@ export function AssociateCalendar() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token');
 
-      const response = await fetch(`/api/events/${id}`, {
+      const response = await fetch(`${API_URL}/api/events/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -412,7 +413,7 @@ export function AssociateCalendar() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token');
 
-      const response = await fetch(`/api/events/${id}/send-reminder`, {
+      const response = await fetch(`${API_URL}/api/events/${id}/send-reminder`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
