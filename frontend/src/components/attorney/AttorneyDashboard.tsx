@@ -10,10 +10,11 @@ import {
   ChevronRight,
   Search,
   MessageSquare,
-  Upload
+  Upload,
+  Clock,
 } from 'lucide-react';
-import { dashboardService, authService, caseService } from '../services/api';
-import type{ Case, Document, User as UserType } from '../../types/Types';
+import { dashboardService, authService, caseService, eventsService } from '../services/api';
+import type { Case, Document, User as UserType } from '../../types/Types';
 
 interface AssociateDashboardProps {
   onNavigate: (page: string) => void;
@@ -24,8 +25,9 @@ interface DashboardStats {
   recentDocuments: number;
   clientCommunications: number;
   upcomingDeadlines: number;
+  upcomingEvents: number;
+  activeEvents: number;
 }
-
 
 interface DeadlineItem {
   case: string;
@@ -37,6 +39,24 @@ interface DeadlineItem {
   status: 'preparation' | 'review' | 'pending';
 }
 
+interface DashboardEvent {
+  id: number;
+  title: string;
+  event_type: 'meeting' | 'deadline' | 'hearing' | 'court_date' | 'filing' | 'consultation' | 'other';
+  start_time: string;
+  end_time: string;
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'postponed';
+  priority: 'low' | 'medium' | 'high';
+  location?: string;
+  meeting_link?: string;
+  case_id?: number;
+  case_title?: string;
+  case_number?: string;
+  assigned_to_name?: string;
+  client_invited: boolean;
+  client_confirmed: boolean;
+}
+
 export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,11 +65,15 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
     assignedCases: 0,
     recentDocuments: 0,
     clientCommunications: 0,
-    upcomingDeadlines: 0
+    upcomingDeadlines: 0,
+    upcomingEvents: 0,
+    activeEvents: 0
   });
   const [assignedCases, setAssignedCases] = useState<Case[]>([]);
   const [recentDocuments, setRecentDocuments] = useState<Document[]>([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<DeadlineItem[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<DashboardEvent[]>([]);
+  const [todaysEvents, setTodaysEvents] = useState<DashboardEvent[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -70,7 +94,9 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
             fetchStats(meData.user.law_firm_id),
             fetchAssignedCases(meData.user.id),
             fetchRecentDocuments(),
-            fetchUpcomingDeadlines()
+            fetchUpcomingDeadlines(),
+            fetchUpcomingDashboardEvents(),
+            fetchTodaysEvents()
           ]);
         }
       }
@@ -85,12 +111,10 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
   const fetchStats = async (lawFirmId: number) => {
     try {
       const statsData = await dashboardService.getStats(lawFirmId);
-      setStats({
+      setStats(prev => ({
+        ...prev,
         assignedCases: statsData.active_cases || 0,
-        recentDocuments: 0, // This would need a separate endpoint
-        clientCommunications: 0, // This would need a separate endpoint
-        upcomingDeadlines: 5 // Default value, would need calculation
-      });
+      }));
     } catch (err) {
       console.error('Error fetching stats:', err);
     }
@@ -147,6 +171,71 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
     }
   };
 
+  const fetchUpcomingDashboardEvents = async () => {
+    try {
+      const eventsData = await eventsService.getUpcomingEvents(5);
+      setStats(prev => ({ ...prev, upcomingEvents: eventsData.length }));
+      
+      // Transform events for dashboard display
+      const dashboardEvents: DashboardEvent[] = eventsData.map((event: any) => ({
+        id: event.id,
+        title: event.title,
+        event_type: event.event_type,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        status: event.status,
+        priority: event.priority,
+        location: event.location,
+        meeting_link: event.meeting_link,
+        case_id: event.case_id,
+        case_title: event.case_title,
+        case_number: event.case_number,
+        assigned_to_name: event.assigned_to_name,
+        client_invited: event.client_invited,
+        client_confirmed: event.client_confirmed
+      }));
+      
+      setUpcomingEvents(dashboardEvents);
+    } catch (err) {
+      console.error('Error fetching upcoming events:', err);
+    }
+  };
+
+  const fetchTodaysEvents = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const eventsData = await eventsService.getAll({
+        start_date: today,
+        end_date: today,
+        status: 'scheduled'
+      });
+      
+      setStats(prev => ({ ...prev, activeEvents: eventsData.length }));
+      
+      const todaysEventsData: DashboardEvent[] = eventsData.map((event: any) => ({
+        id: event.id,
+        title: event.title,
+        event_type: event.event_type,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        status: event.status,
+        priority: event.priority,
+        location: event.location,
+        meeting_link: event.meeting_link,
+        case_id: event.case_id,
+        case_title: event.case_title,
+        case_number: event.case_number,
+        assigned_to_name: event.assigned_to_name,
+        client_invited: event.client_invited,
+        client_confirmed: event.client_confirmed
+      }));
+      
+      setTodaysEvents(todaysEventsData);
+    } catch (err) {
+      console.error('Error fetching today\'s events:', err);
+    }
+  };
+
   const timeAgo = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -179,6 +268,63 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
     });
   };
 
+  const formatTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  /*const getEventTypeColor = (type: DashboardEvent['event_type']) => {
+    switch (type) {
+      case 'meeting':
+        return 'bg-primary/10 text-primary border-primary/20';
+      case 'hearing':
+      case 'court_date':
+        return 'bg-destructive/10 text-destructive border-destructive/20';
+      case 'deadline':
+      case 'filing':
+        return 'bg-warning/10 text-warning border-warning/20';
+      case 'consultation':
+        return 'bg-accent/10 text-accent border-accent/20';
+      case 'other':
+      default:
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  };*/
+
+  const getEventTypeBadge = (type: DashboardEvent['event_type']) => {
+    switch (type) {
+      case 'meeting':
+        return 'Meeting';
+      case 'hearing':
+        return 'Hearing';
+      case 'court_date':
+        return 'Court Date';
+      case 'deadline':
+        return 'Deadline';
+      case 'filing':
+        return 'Filing';
+      case 'consultation':
+        return 'Consultation';
+      case 'other':
+        return 'Other';
+    }
+  };
+
+ /* const getPriorityColor = (priority: DashboardEvent['priority']) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-destructive/10 text-destructive';
+      case 'medium':
+        return 'bg-warning/10 text-warning';
+      case 'low':
+        return 'bg-muted/10 text-muted-foreground';
+    }
+  };*/
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Active': return 'success';
@@ -187,6 +333,7 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
       default: return 'default';
     }
   };
+
   if (loading) {
     return (
       <div className="p-6 md:p-8 space-y-6">
@@ -300,10 +447,25 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
             <p className="text-sm text-muted-foreground">Upcoming Deadlines</p>
           </CardContent>
         </Card>
+
+        <Card className="bg-gradient-to-br from-success/5 to-transparent border-success/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                <Clock className="w-6 h-6 text-success" />
+              </div>
+              <Badge variant="default" className="text-xs">
+                {stats.activeEvents} today
+              </Badge>
+            </div>
+            <h3 className="text-2xl font-semibold text-foreground mb-1">{stats.upcomingEvents}</h3>
+            <p className="text-sm text-muted-foreground">Upcoming Events</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Assigned Cases */}
+        {/* Main Content - Left Side */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
@@ -440,6 +602,7 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
 
         {/* Right Sidebar */}
         <div className="space-y-6">
+          {/* Search Bar */}
           <Card>
             <CardContent className="p-4">
               <div className="relative">
@@ -452,6 +615,61 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Today's Events */}
+          {todaysEvents.length > 0 && (
+            <Card className="bg-gradient-to-br from-success/5 to-transparent border-success/20">
+              <CardHeader>
+                <CardTitle className="text-base">Today's Events</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {todaysEvents.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="px-6 py-4 hover:bg-success/5 transition-colors cursor-pointer"
+                      onClick={() => onNavigate(`events/${event.id}`)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground mb-1 truncate">
+                            {event.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="default" className="text-xs">
+                              {getEventTypeBadge(event.event_type)}
+                            </Badge>
+                            {event.priority === 'high' && (
+                              <Badge variant="warning" className="text-xs">High</Badge>
+                            )}
+                            {event.client_invited && (
+                              <Badge variant="default" className="text-xs">Client</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-medium text-success">
+                            {formatTime(event.start_time)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="truncate" title={event.case_title}>
+                          {event.case_number || 'No case'}
+                        </span>
+                        <span className={`px-2 py-1 rounded ${
+                          event.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          event.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Upcoming Deadlines */}
           <Card>
@@ -507,6 +725,72 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
             </CardContent>
           </Card>
 
+          {/* Upcoming Events */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Upcoming Events</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {upcomingEvents.map((event) => {
+                  const eventDate = new Date(event.start_time);
+                  const today = new Date();
+                  const daysDiff = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                  
+                  return (
+                    <div 
+                      key={event.id} 
+                      className="px-6 py-4 hover:bg-muted/30 transition-colors cursor-pointer group"
+                      onClick={() => onNavigate(`events/${event.id}`)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground mb-1 truncate group-hover:text-primary">
+                            {event.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="default" className="text-xs">
+                              {getEventTypeBadge(event.event_type)}
+                            </Badge>
+                            {event.priority === 'high' && (
+                              <Badge variant="warning" className="text-xs">High Priority</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant={daysDiff <= 1 ? 'error' : daysDiff <= 3 ? 'warning' : 'default'} className="text-xs">
+                          {daysDiff === 0 ? 'Today' : daysDiff === 1 ? 'Tomorrow' : `${daysDiff}d`}
+                        </Badge>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(event.start_time)}</span>
+                          <Clock className="w-3 h-3 ml-2" />
+                          <span>{formatTime(event.start_time)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground truncate" title={event.case_title}>
+                            {event.case_number || 'No case'}
+                          </span>
+                          {event.assigned_to_name && (
+                            <span className="text-accent">{event.assigned_to_name}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {upcomingEvents.length === 0 && (
+                  <div className="px-6 py-4 text-center">
+                    <Clock className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">No upcoming events</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Quick Links */}
           <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
             <CardHeader>
@@ -528,6 +812,14 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
               >
                 <Briefcase className="w-4 h-4" />
                 Case Management
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2" 
+                onClick={() => onNavigate('events')}
+              >
+                <Calendar className="w-4 h-4" />
+                Calendar & Events
               </Button>
               <Button 
                 variant="outline" 

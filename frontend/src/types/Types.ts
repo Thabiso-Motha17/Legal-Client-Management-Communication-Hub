@@ -139,6 +139,105 @@ export interface Note {
   user_name?: string;
 }
 
+// Event Types
+export interface Event {
+  id: number;
+  title: string;
+  description?: string;
+  event_type: 'meeting' | 'deadline' | 'hearing' | 'court_date' | 'filing' | 'consultation' | 'other';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'postponed';
+  priority: 'low' | 'medium' | 'high';
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  location?: string;
+  meeting_link?: string;
+  address?: string;
+  case_id: number;
+  law_firm_id: number;
+  created_by_user_id: number;
+  assigned_to_user_id?: number;
+  client_invited: boolean;
+  client_confirmed: boolean;
+  reminder_sent: boolean;
+  reminder_minutes_before: number;
+  last_reminder_sent_at?: string;
+  is_recurring: boolean;
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrence_end_date?: string;
+  document_id?: number;
+  created_at: string;
+  updated_at: string;
+  
+  // Optional joined fields
+  case_title?: string;
+  case_number?: string;
+  client_name?: string;
+  assigned_to_name?: string;
+  created_by_name?: string;
+  document_name?: string;
+}
+
+export interface CreateEventData {
+  title: string;
+  description?: string;
+  event_type: Event['event_type'];
+  status?: Event['status'];
+  priority?: Event['priority'];
+  start_time: string;
+  end_time: string;
+  all_day?: boolean;
+  location?: string;
+  meeting_link?: string;
+  address?: string;
+  case_id: number;
+  assigned_to_user_id?: number;
+  client_invited?: boolean;
+  client_confirmed?: boolean;
+  reminder_minutes_before?: number;
+  is_recurring?: boolean;
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrence_end_date?: string;
+  document_id?: number;
+}
+
+export interface UpdateEventData {
+  title?: string;
+  description?: string;
+  event_type?: Event['event_type'];
+  status?: Event['status'];
+  priority?: Event['priority'];
+  start_time?: string;
+  end_time?: string;
+  all_day?: boolean;
+  location?: string;
+  meeting_link?: string;
+  address?: string;
+  assigned_to_user_id?: number;
+  client_invited?: boolean;
+  client_confirmed?: boolean;
+  reminder_minutes_before?: number;
+  reminder_sent?: boolean;
+  is_recurring?: boolean;
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrence_end_date?: string;
+  document_id?: number;
+}
+
+export interface EventFilters {
+  status?: string;
+  event_type?: string;
+  case_id?: number;
+  assigned_to_user_id?: number;
+  start_date?: string;
+  end_date?: string;
+  search?: string;
+  upcoming?: boolean;
+  past?: boolean;
+  page?: number;
+  limit?: number;
+}
+
 export interface Invoice {
   id: number;
   invoice_number: string;
