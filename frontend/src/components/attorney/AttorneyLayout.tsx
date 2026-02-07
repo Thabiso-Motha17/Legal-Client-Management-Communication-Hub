@@ -10,7 +10,8 @@ import {
   X,
   Shield,
   Users,
-  Settings
+  Settings,
+  CalendarIcon
 } from 'lucide-react';
 
 import { AssociateDashboard } from './AttorneyDashboard';
@@ -23,6 +24,7 @@ import { authService } from '../services/api';
 import type{ User } from '../../types/Types';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
+import { AssociateCalendar } from './AssociateCalendar';
 
 interface AssociateLayoutProps {
   onLogout: () => void;
@@ -60,6 +62,8 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
     { id: 'documents', name: 'Documents', icon: FileText },
     { id: 'clients', name: 'Clients', icon: Users },
     { id: 'notes', name: 'Notes', icon: CheckCircle },
+    { id: 'calendar', name: 'Calendar', icon: CalendarIcon }
+
   ];
 
   // Add settings only if user has full access permission
@@ -87,6 +91,8 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
         return <AssociateNotes />;
       case 'documents':
         return <AssociateDocuments />;
+      case 'calendar':
+        return <AssociateCalendar />;
       case 'settings':
         // Only render settings if user has full access
         if (hasFullAccess) {

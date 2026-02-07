@@ -1934,6 +1934,866 @@ app.delete('/api/notes/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ==================== EVENTS ====================
+app.get('/api/events', authenticateToken, async (req, res) => {
+  try {
+    let query = `
+      SELECT e.*,
+        c.file_number,
+        c.case_number,
+        c.title as case_title,
+        u1.full_name as created_by_name,
+        u2.full_name as assigned_to_name,
+        d.name as document_name,
+        cl.name as client_name
+      FROM events e
+      LEFT JOIN cases c ON e.case_id = c.id
+      LEFT JOIN users u1 ON e.created_by_user_id = u1.id
+      LEFT JOIN users u2 ON e.assigned_to_user_id = u2.id
+      LEFT JOIN documents d ON e.document_id = d.id
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+
+    // Apply filters based on user role
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      // Admin/associate can see all events from their law firm
+      query += ` AND e.law_firm_id = $${paramIndex}`;
+      params.push(req.user.lawFirmId);
+      paramIndex++;
+    } else if (req.user.role === 'client') {
+      // Client can only see events for their cases where they're invited
+      query += ` AND e.case_id IN (
+        SELECT id FROM cases WHERE client_id IN (
+          SELECT id FROM clients WHERE user_account_id = $${paramIndex}
+        )
+      ) AND e.client_invited = true`;
+      params.push(req.user.id);
+      paramIndex++;
+    }
+
+    // Apply filters from query parameters
+    if (req.query.case_id) {
+      query += ` AND e.case_id = $${paramIndex}`;
+      params.push(req.query.case_id);
+      paramIndex++;
+    }
+
+    if (req.query.status) {
+      query += ` AND e.status = $${paramIndex}`;
+      params.push(req.query.status);
+      paramIndex++;
+    }
+
+    if (req.query.event_type) {
+      query += ` AND e.event_type = $${paramIndex}`;
+      params.push(req.query.event_type);
+      paramIndex++;
+    }
+
+    if (req.query.assigned_to_user_id) {
+      query += ` AND e.assigned_to_user_id = $${paramIndex}`;
+      params.push(req.query.assigned_to_user_id);
+      paramIndex++;
+    }
+
+    if (req.query.start_date) {
+      query += ` AND DATE(e.start_time) >= $${paramIndex}`;
+      params.push(req.query.start_date);
+      paramIndex++;
+    }
+
+    if (req.query.end_date) {
+      query += ` AND DATE(e.start_time) <= $${paramIndex}`;
+      params.push(req.query.end_date);
+      paramIndex++;
+    }
+
+    if (req.query.upcoming) {
+      query += ` AND e.start_time >= CURRENT_TIMESTAMP 
+                 AND e.status IN ('scheduled', 'confirmed')`;
+    }
+
+    if (req.query.past) {
+      query += ` AND e.end_time < CURRENT_TIMESTAMP 
+                 AND e.status IN ('completed', 'cancelled')`;
+    }
+
+    if (req.query.search) {
+      query += ` AND (e.title ILIKE $${paramIndex} OR e.description ILIKE $${paramIndex})`;
+      params.push(`%${req.query.search}%`);
+      paramIndex++;
+    }
+
+    query += ' ORDER BY e.start_time ASC';
+
+    console.log('Executing events query:', query, params);
+    const result = await pool.query(query, params);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get events error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/events/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      SELECT e.*,
+        c.file_number,
+        c.case_number,
+        c.title as case_title,
+        u1.full_name as created_by_name,
+        u1.email as created_by_email,
+        u2.full_name as assigned_to_name,
+        u2.email as assigned_to_email,
+        d.name as document_name,
+        d.file_name as document_file_name,
+        cl.name as client_name,
+        cl.email as client_email
+      FROM events e
+      LEFT JOIN cases c ON e.case_id = c.id
+      LEFT JOIN users u1 ON e.created_by_user_id = u1.id
+      LEFT JOIN users u2 ON e.assigned_to_user_id = u2.id
+      LEFT JOIN documents d ON e.document_id = d.id
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE e.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = result.rows[0];
+
+    // Check access permissions
+    let hasAccess = false;
+    
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      // Admin/associate can access if event belongs to their law firm
+      hasAccess = event.law_firm_id === req.user.lawFirmId;
+    } else if (req.user.role === 'client') {
+      // Client can access if they're the client for the case AND they're invited
+      const clientCheck = await pool.query(
+        `SELECT c.id FROM cases cs
+         JOIN clients c ON cs.client_id = c.id
+         WHERE cs.id = $1 AND c.user_account_id = $2`,
+        [event.case_id, req.user.id]
+      );
+      hasAccess = clientCheck.rows.length > 0 && event.client_invited;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    res.json(event);
+  } catch (error) {
+    console.error('Get event by id error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/events', authenticateToken, async (req, res) => {
+  try {
+    // Only admin and associate can create events
+    if (req.user.role !== 'admin' && req.user.role !== 'associate') {
+      return res.status(403).json({ error: 'Admin/Associate access required' });
+    }
+
+    const {
+      title,
+      description,
+      event_type,
+      status = 'scheduled',
+      priority = 'medium',
+      start_time,
+      end_time,
+      all_day = false,
+      location,
+      meeting_link,
+      address,
+      case_id,
+      assigned_to_user_id,
+      client_invited = false,
+      client_confirmed = false,
+      reminder_minutes_before = 30,
+      is_recurring = false,
+      recurrence_pattern,
+      recurrence_end_date,
+      document_id
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !event_type || !start_time || !end_time || !case_id) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        missing: {
+          title: !title,
+          event_type: !event_type,
+          start_time: !start_time,
+          end_time: !end_time,
+          case_id: !case_id
+        }
+      });
+    }
+
+    // Validate event type
+    const validEventTypes = ['meeting', 'deadline', 'hearing', 'court_date', 'filing', 'consultation', 'other'];
+    if (!validEventTypes.includes(event_type)) {
+      return res.status(400).json({ error: 'Invalid event type' });
+    }
+
+    // Validate status
+    const validStatuses = ['scheduled', 'confirmed', 'completed', 'cancelled', 'postponed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    // Validate priority
+    const validPriorities = ['low', 'medium', 'high'];
+    if (priority && !validPriorities.includes(priority)) {
+      return res.status(400).json({ error: 'Invalid priority' });
+    }
+
+    // Validate start and end times
+    const startTime = new Date(start_time);
+    const endTime = new Date(end_time);
+    
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' });
+    }
+
+    if (endTime <= startTime) {
+      return res.status(400).json({ error: 'End time must be after start time' });
+    }
+
+    // Check if case belongs to same law firm
+    const caseCheck = await pool.query(
+      'SELECT law_firm_id FROM cases WHERE id = $1',
+      [case_id]
+    );
+    
+    if (caseCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Case not found' });
+    }
+    
+    if (caseCheck.rows[0].law_firm_id !== req.user.lawFirmId) {
+      return res.status(403).json({ error: 'Case does not belong to your law firm' });
+    }
+
+    // Check if assigned user belongs to same law firm (if provided)
+    if (assigned_to_user_id) {
+      const userCheck = await pool.query(
+        'SELECT law_firm_id, role FROM users WHERE id = $1',
+        [assigned_to_user_id]
+      );
+      
+      if (userCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Assigned user not found' });
+      }
+      
+      if (userCheck.rows[0].law_firm_id !== req.user.lawFirmId) {
+        return res.status(400).json({ error: 'Assigned user does not belong to your law firm' });
+      }
+      
+      // Only allow assigning to admin or associate roles
+      if (!['admin', 'associate'].includes(userCheck.rows[0].role)) {
+        return res.status(400).json({ error: 'Can only assign to admin or associate users' });
+      }
+    }
+
+    // Check if document belongs to same law firm (if provided)
+    if (document_id) {
+      const documentCheck = await pool.query(
+        'SELECT law_firm_id FROM documents WHERE id = $1',
+        [document_id]
+      );
+      
+      if (documentCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Document not found' });
+      }
+      
+      if (documentCheck.rows[0].law_firm_id !== req.user.lawFirmId) {
+        return res.status(400).json({ error: 'Document does not belong to your law firm' });
+      }
+    }
+
+    // Validate recurrence pattern if is_recurring is true
+    if (is_recurring) {
+      if (!recurrence_pattern) {
+        return res.status(400).json({ error: 'Recurrence pattern is required for recurring events' });
+      }
+      
+      const validPatterns = ['daily', 'weekly', 'monthly', 'yearly'];
+      if (!validPatterns.includes(recurrence_pattern)) {
+        return res.status(400).json({ error: 'Invalid recurrence pattern' });
+      }
+      
+      if (recurrence_end_date) {
+        const endDate = new Date(recurrence_end_date);
+        if (isNaN(endDate.getTime()) || endDate < startTime) {
+          return res.status(400).json({ error: 'Invalid recurrence end date' });
+        }
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO events (
+        title, description, event_type, status, priority,
+        start_time, end_time, all_day, location, meeting_link, address,
+        case_id, law_firm_id, created_by_user_id, assigned_to_user_id,
+        client_invited, client_confirmed, reminder_minutes_before,
+        is_recurring, recurrence_pattern, recurrence_end_date, document_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+      RETURNING *`,
+      [
+        title,
+        description || '',
+        event_type,
+        status,
+        priority,
+        start_time,
+        end_time,
+        all_day,
+        location || '',
+        meeting_link || '',
+        address || '',
+        case_id,
+        req.user.lawFirmId,
+        req.user.id,
+        assigned_to_user_id || null,
+        client_invited,
+        client_confirmed,
+        reminder_minutes_before,
+        is_recurring,
+        is_recurring ? recurrence_pattern : null,
+        is_recurring ? recurrence_end_date : null,
+        document_id || null
+      ]
+    );
+
+    console.log(`Event created: ${title}, ID: ${result.rows[0].id}`);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create event error:', error);
+    
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Event constraint violation' });
+    } else if (error.code === '23503') {
+      return res.status(400).json({ error: 'Invalid foreign key reference' });
+    } else if (error.code === '23514') {
+      return res.status(400).json({ error: 'Check constraint violation' });
+    }
+    
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/events/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Check if event exists and get current data
+    const eventCheck = await pool.query(
+      'SELECT * FROM events WHERE id = $1',
+      [id]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    const event = eventCheck.rows[0];
+
+    // Check access permissions
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      if (event.law_firm_id !== req.user.lawFirmId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    } else if (req.user.role === 'client') {
+      // Client can only update client_confirmed field for events they're invited to
+      const clientCheck = await pool.query(
+        `SELECT c.id FROM cases cs
+         JOIN clients c ON cs.client_id = c.id
+         WHERE cs.id = $1 AND c.user_account_id = $2`,
+        [event.case_id, req.user.id]
+      );
+      
+      if (clientCheck.rows.length === 0 || !event.client_invited) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      // Client can only update client_confirmed
+      const allowedClientFields = ['client_confirmed'];
+      const updateKeys = Object.keys(updateData);
+      const invalidFields = updateKeys.filter(key => !allowedClientFields.includes(key));
+      
+      if (invalidFields.length > 0) {
+        return res.status(403).json({ 
+          error: 'Clients can only update client_confirmed field',
+          invalidFields 
+        });
+      }
+    }
+
+    // Validate updates for admin/associate
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      // Validate start_time and end_time if provided
+      if (updateData.start_time || updateData.end_time) {
+        const startTime = new Date(updateData.start_time || event.start_time);
+        const endTime = new Date(updateData.end_time || event.end_time);
+        
+        if (endTime <= startTime) {
+          return res.status(400).json({ error: 'End time must be after start time' });
+        }
+      }
+
+      // Validate assigned_to_user_id if provided
+      if (updateData.assigned_to_user_id) {
+        const userCheck = await pool.query(
+          'SELECT law_firm_id, role FROM users WHERE id = $1',
+          [updateData.assigned_to_user_id]
+        );
+        
+        if (userCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Assigned user not found' });
+        }
+        
+        if (userCheck.rows[0].law_firm_id !== req.user.lawFirmId) {
+          return res.status(400).json({ error: 'Assigned user does not belong to your law firm' });
+        }
+        
+        if (!['admin', 'associate'].includes(userCheck.rows[0].role)) {
+          return res.status(400).json({ error: 'Can only assign to admin or associate users' });
+        }
+      }
+
+      // Validate document_id if provided
+      if (updateData.document_id) {
+        const documentCheck = await pool.query(
+          'SELECT law_firm_id FROM documents WHERE id = $1',
+          [updateData.document_id]
+        );
+        
+        if (documentCheck.rows.length === 0) {
+          return res.status(400).json({ error: 'Document not found' });
+        }
+        
+        if (documentCheck.rows[0].law_firm_id !== req.user.lawFirmId) {
+          return res.status(400).json({ error: 'Document does not belong to your law firm' });
+        }
+      }
+    }
+
+    // Define allowed columns for update based on role
+    let allowedColumns;
+    if (req.user.role === 'client') {
+      allowedColumns = ['client_confirmed'];
+    } else {
+      allowedColumns = [
+        'title', 'description', 'event_type', 'status', 'priority',
+        'start_time', 'end_time', 'all_day', 'location', 'meeting_link', 'address',
+        'assigned_to_user_id', 'client_invited', 'client_confirmed',
+        'reminder_minutes_before', 'reminder_sent', 'last_reminder_sent_at',
+        'is_recurring', 'recurrence_pattern', 'recurrence_end_date', 'document_id'
+      ];
+    }
+
+    const { query, values } = buildUpdateQuery('events', id, updateData, allowedColumns);
+    const result = await pool.query(query, values);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update event error:', error);
+    
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Event constraint violation' });
+    } else if (error.code === '23503') {
+      return res.status(400).json({ error: 'Invalid foreign key reference' });
+    } else if (error.code === '23514') {
+      return res.status(400).json({ error: 'Check constraint violation' });
+    }
+    
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/events/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Only admin and associate can delete events
+    if (req.user.role !== 'admin' && req.user.role !== 'associate') {
+      return res.status(403).json({ error: 'Admin/Associate access required' });
+    }
+
+    // Check if event exists
+    const eventCheck = await pool.query(
+      'SELECT * FROM events WHERE id = $1',
+      [id]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = eventCheck.rows[0];
+
+    // Check if event belongs to user's law firm
+    if (event.law_firm_id !== req.user.lawFirmId) {
+      return res.status(403).json({ error: 'Cannot delete event from another law firm' });
+    }
+
+    // Check if user created the event or is admin
+    if (req.user.role !== 'admin' && event.created_by_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only delete events you created' });
+    }
+
+    // Perform the deletion
+    const deleteResult = await pool.query(
+      'DELETE FROM events WHERE id = $1 RETURNING id, title, start_time',
+      [id]
+    );
+
+    console.log(`Event deleted: ${event.title}, ID: ${id}, by user: ${req.user.id}`);
+    res.json({ 
+      success: true,
+      message: 'Event deleted successfully',
+      event: {
+        id: deleteResult.rows[0].id,
+        title: deleteResult.rows[0].title,
+        start_time: deleteResult.rows[0].start_time
+      }
+    });
+  } catch (error) {
+    console.error('Delete event error:', error);
+    
+    if (error.code === '23503') {
+      return res.status(400).json({ 
+        error: 'Cannot delete event: Event is referenced by other records' 
+      });
+    }
+    
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== SPECIAL EVENT ENDPOINTS ====================
+app.get('/api/events/upcoming', authenticateToken, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    
+    let query = `
+      SELECT e.*,
+        c.file_number,
+        c.case_number,
+        c.title as case_title,
+        u.full_name as assigned_to_name,
+        cl.name as client_name
+      FROM events e
+      LEFT JOIN cases c ON e.case_id = c.id
+      LEFT JOIN users u ON e.assigned_to_user_id = u.id
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE e.status IN ('scheduled', 'confirmed')
+        AND e.start_time >= CURRENT_TIMESTAMP
+        AND e.start_time <= CURRENT_TIMESTAMP + INTERVAL '${days} days'
+    `;
+    const params = [];
+
+    // Apply role-based filters
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      query += ' AND e.law_firm_id = $1';
+      params.push(req.user.lawFirmId);
+      
+      // Filter by assigned user if requested
+      if (req.query.assigned_to) {
+        query += ' AND e.assigned_to_user_id = $2';
+        params.push(req.query.assigned_to);
+      }
+    } else if (req.user.role === 'client') {
+      // Client can only see events for their cases where they're invited
+      query += ` AND e.case_id IN (
+        SELECT id FROM cases WHERE client_id IN (
+          SELECT id FROM clients WHERE user_account_id = $1
+        )
+      ) AND e.client_invited = true`;
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY e.start_time ASC';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Upcoming events error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/cases/:caseId/events', authenticateToken, async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    
+    // Check if user has access to the case
+    const caseCheck = await pool.query(
+      'SELECT law_firm_id, client_id FROM cases WHERE id = $1',
+      [caseId]
+    );
+    
+    if (caseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+    
+    const caseData = caseCheck.rows[0];
+    let hasAccess = false;
+    
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      hasAccess = caseData.law_firm_id === req.user.lawFirmId;
+    } else if (req.user.role === 'client') {
+      const clientCheck = await pool.query(
+        'SELECT id FROM clients WHERE id = $1 AND user_account_id = $2',
+        [caseData.client_id, req.user.id]
+      );
+      hasAccess = clientCheck.rows.length > 0;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const result = await pool.query(`
+      SELECT e.*,
+        u.full_name as assigned_to_name,
+        d.name as document_name
+      FROM events e
+      LEFT JOIN users u ON e.assigned_to_user_id = u.id
+      LEFT JOIN documents d ON e.document_id = d.id
+      WHERE e.case_id = $1
+      ORDER BY e.start_time ASC
+    `, [caseId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get case events error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/events/calendar/:year/:month', authenticateToken, async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = new Date(year, parseInt(month), 0).toISOString().split('T')[0]; // Last day of month
+
+    let query = `
+      SELECT e.*,
+        c.file_number,
+        c.case_number,
+        c.title as case_title,
+        u.full_name as assigned_to_name,
+        cl.name as client_name
+      FROM events e
+      LEFT JOIN cases c ON e.case_id = c.id
+      LEFT JOIN users u ON e.assigned_to_user_id = u.id
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE e.start_time >= $1::timestamp
+        AND e.start_time <= $2::timestamp + INTERVAL '1 day'
+    `;
+    const params = [startDate, endDate];
+
+    // Apply role-based filters
+    if (req.user.role === 'admin' || req.user.role === 'associate') {
+      query += ' AND e.law_firm_id = $3';
+      params.push(req.user.lawFirmId);
+    } else if (req.user.role === 'client') {
+      query += ` AND e.case_id IN (
+        SELECT id FROM cases WHERE client_id IN (
+          SELECT id FROM clients WHERE user_account_id = $3
+        )
+      ) AND e.client_invited = true`;
+      params.push(req.user.id);
+    }
+
+    query += ' ORDER BY e.start_time ASC';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Calendar events error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/events/:id/send-reminder', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Only admin and associate can send reminders
+    if (req.user.role !== 'admin' && req.user.role !== 'associate') {
+      return res.status(403).json({ error: 'Admin/Associate access required' });
+    }
+
+    // Check if event exists
+    const eventCheck = await pool.query(
+      'SELECT * FROM events WHERE id = $1',
+      [id]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const event = eventCheck.rows[0];
+
+    // Check if event belongs to user's law firm
+    if (event.law_firm_id !== req.user.lawFirmId) {
+      return res.status(403).json({ error: 'Cannot send reminder for event from another law firm' });
+    }
+
+    // Check if event is in the future
+    if (event.start_time <= new Date()) {
+      return res.status(400).json({ error: 'Cannot send reminder for past events' });
+    }
+
+    // Check if reminder was already sent recently (within last hour)
+    if (event.last_reminder_sent_at) {
+      const lastSent = new Date(event.last_reminder_sent_at);
+      const now = new Date();
+      const hoursDiff = (now - lastSent) / (1000 * 60 * 60);
+      
+      if (hoursDiff < 1) {
+        return res.status(400).json({ error: 'Reminder was already sent within the last hour' });
+      }
+    }
+
+    // Update reminder status
+    const result = await pool.query(
+      `UPDATE events 
+       SET reminder_sent = true, 
+           last_reminder_sent_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    // In a real application, you would send email/SMS notifications here
+    // For now, we'll just log it
+    console.log(`Reminder sent for event: ${event.title}, ID: ${id}`);
+    
+    // Get event details for notification
+    const eventDetails = await pool.query(`
+      SELECT e.*,
+        c.title as case_title,
+        u.full_name as assigned_to_name,
+        u.email as assigned_to_email,
+        cl.name as client_name,
+        cl.email as client_email
+      FROM events e
+      LEFT JOIN cases c ON e.case_id = c.id
+      LEFT JOIN users u ON e.assigned_to_user_id = u.id
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE e.id = $1
+    `, [id]);
+
+    res.json({
+      success: true,
+      message: 'Reminder sent successfully',
+      event: result.rows[0],
+      notificationDetails: {
+        assignedTo: eventDetails.rows[0].assigned_to_email,
+        clientInvited: event.client_invited,
+        clientEmail: eventDetails.rows[0].client_email,
+        eventTime: event.start_time
+      }
+    });
+  } catch (error) {
+    console.error('Send reminder error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add this after all other event endpoints but before the error handling middleware
+// ==================== EVENT STATS ====================
+app.get('/api/stats/events', authenticateToken, async (req, res) => {
+  try {
+    const { period = 'month' } = req.query;
+    
+    let dateFilter = '';
+    switch (period) {
+      case 'week':
+        dateFilter = "AND start_time >= CURRENT_DATE - INTERVAL '7 days'";
+        break;
+      case 'month':
+        dateFilter = "AND start_time >= CURRENT_DATE - INTERVAL '30 days'";
+        break;
+      case 'quarter':
+        dateFilter = "AND start_time >= CURRENT_DATE - INTERVAL '90 days'";
+        break;
+      case 'year':
+        dateFilter = "AND start_time >= CURRENT_DATE - INTERVAL '365 days'";
+        break;
+      default:
+        dateFilter = "AND start_time >= CURRENT_DATE - INTERVAL '30 days'";
+    }
+
+    const query = `
+      SELECT 
+        -- Total events
+        COUNT(*) as total_events,
+        
+        -- Events by status
+        COUNT(*) FILTER (WHERE status = 'scheduled') as scheduled_events,
+        COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed_events,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_events,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_events,
+        COUNT(*) FILTER (WHERE status = 'postponed') as postponed_events,
+        
+        -- Events by type
+        COUNT(*) FILTER (WHERE event_type = 'meeting') as meetings,
+        COUNT(*) FILTER (WHERE event_type = 'deadline') as deadlines,
+        COUNT(*) FILTER (WHERE event_type = 'hearing') as hearings,
+        COUNT(*) FILTER (WHERE event_type = 'court_date') as court_dates,
+        COUNT(*) FILTER (WHERE event_type = 'filing') as filings,
+        COUNT(*) FILTER (WHERE event_type = 'consultation') as consultations,
+        
+        -- Upcoming events
+        COUNT(*) FILTER (WHERE status IN ('scheduled', 'confirmed') AND start_time > CURRENT_TIMESTAMP) as upcoming_events,
+        
+        -- Past events
+        COUNT(*) FILTER (WHERE end_time < CURRENT_TIMESTAMP) as past_events,
+        
+        -- Events with clients
+        COUNT(*) FILTER (WHERE client_invited = true) as client_invited_events,
+        COUNT(*) FILTER (WHERE client_confirmed = true) as client_confirmed_events,
+        
+        -- Recurring events
+        COUNT(*) FILTER (WHERE is_recurring = true) as recurring_events
+        
+      FROM events
+      WHERE law_firm_id = $1 ${dateFilter}
+    `;
+
+    const result = await pool.query(query, [req.user.lawFirmId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No event statistics found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Event stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== INVOICES ====================
 app.get('/api/invoices', authenticateToken, async (req, res) => {
   try {
