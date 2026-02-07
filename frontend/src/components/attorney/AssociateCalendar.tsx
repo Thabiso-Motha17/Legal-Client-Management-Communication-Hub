@@ -986,7 +986,6 @@ export function AssociateCalendar() {
                 </CardHeader>
                 <CardContent>
                   <Calendar
-                    mode="single"
                     selected={selectedDate}
                     onSelect={(date) => date && setSelectedDate(date)}
                     className="rounded-md border"
