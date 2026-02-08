@@ -207,7 +207,6 @@ export function AssociateDashboard({ onNavigate }: AssociateDashboardProps) {
       const eventsData = await eventsService.getAll({
         start_date: today,
         end_date: today,
-        status: 'scheduled'
       });
       
       setStats(prev => ({ ...prev, activeEvents: eventsData.length }));
