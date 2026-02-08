@@ -464,7 +464,7 @@ export function AssociateCalendar() {
   const weekEvents = getWeekEvents();
   weekEvents.sort((a, b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
   const upcomingEvents = events
-    .filter(e => parseISO(e.start_time) >= new Date() && e.status === 'scheduled')
+    .filter(e => parseISO(e.start_time) >= new Date())
     .sort((a, b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime())
     .slice(0, 5);
 
