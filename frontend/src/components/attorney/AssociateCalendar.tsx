@@ -743,36 +743,6 @@ export function AssociateCalendar() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-foreground block mb-2">Location</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Conference Room A or Virtual"
-                  value={event.location || ''}
-                  onChange={(e) => editingEvent
-                    ? setEditingEvent({...editingEvent, location: e.target.value})
-                    : setNewEvent({...newEvent, location: e.target.value})
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-foreground block mb-2">Meeting Link</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="https://meet.example.com/room"
-                  value={event.meeting_link || ''}
-                  onChange={(e) => editingEvent
-                    ? setEditingEvent({...editingEvent, meeting_link: e.target.value})
-                    : setNewEvent({...newEvent, meeting_link: e.target.value})
-                  }
-                />
-              </div>
-            </div>
-
             <div>
               <label className="text-sm font-medium text-foreground block mb-2">Description</label>
               <textarea
@@ -784,33 +754,6 @@ export function AssociateCalendar() {
                   : setNewEvent({...newEvent, description: e.target.value})
                 }
               />
-            </div>
-
-            <div className="flex items-center gap-4 pt-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={event.all_day}
-                  onChange={(e) => editingEvent
-                    ? setEditingEvent({...editingEvent, all_day: e.target.checked})
-                    : setNewEvent({...newEvent, all_day: e.target.checked})
-                  }
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">All Day Event</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={event.client_invited}
-                  onChange={(e) => editingEvent
-                    ? setEditingEvent({...editingEvent, client_invited: e.target.checked})
-                    : setNewEvent({...newEvent, client_invited: e.target.checked})
-                  }
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">Client Invited</span>
-              </label>
             </div>
 
             <div className="flex items-center gap-3 pt-4">
