@@ -265,6 +265,7 @@ export interface Invoice {
 // ==================== AUTH TYPES ====================
 
 export interface LoginCredentials {
+  role: 'admin' | 'associate' | 'client';
   email: string;
   password: string;
 }

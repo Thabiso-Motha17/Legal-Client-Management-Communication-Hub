@@ -1,11 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
-import { Building, Users, User, TrendingUp, ChevronUp, ChevronDown, Calendar, Loader2 } from 'lucide-react';
+import { Building, Users, User, TrendingUp, ChevronUp, ChevronDown, Calendar, Loader2, HardDrive } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { useEffect, useState } from 'react';
 import type { LawFirm } from '../../types/Types';
 import { apiRequest } from '../lib/api';
-
 
 const useToast = () => {
   const toast = (options: { title: string, description: string, variant?: string }) => {
@@ -18,7 +17,6 @@ const useToast = () => {
   return { toast };
 };
 
-// Type definitions for dashboard data
 interface MonthlyGrowthData {
   month: string;
   companies: number;
@@ -47,6 +45,15 @@ interface RecentSignup {
   plan: string;
 }
 
+// New type for storage data
+interface CompanyStorage {
+  id: number;
+  name: string;
+  storageUsed: number; // in MB
+  documentCount: number;
+  plan: string;
+}
+
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -56,6 +63,8 @@ export function Dashboard() {
     companiesGrowth: 0,
     attorneysGrowth: 0,
     clientsGrowth: 0,
+    totalStorageUsed: 0,      // MB
+    totalDocuments: 0,
   });
   const [recentSignups, setRecentSignups] = useState<RecentSignup[]>([]);
   const [companyDistribution, setCompanyDistribution] = useState<CompanyDistributionData[]>([
@@ -82,6 +91,16 @@ export function Dashboard() {
     { month: 'Dec', clients: 7000 },
     { month: 'Jan', clients: 7500 },
   ]);
+
+  // New state for storage data
+  const [companyStorage, setCompanyStorage] = useState<CompanyStorage[]>([]);
+  const [storageSummary, setStorageSummary] = useState({
+    totalStorageGB: 0,
+    avgStorageGB: 0,
+    topConsumer: '',
+    topStorageGB: 0,
+  });
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,18 +124,27 @@ export function Dashboard() {
       const totalAttorneys = users.filter(u => u.role === 'admin' || u.role === 'associate').length;
       const totalClients = users.filter(u => u.role === 'client').length;
 
-      // Calculate growth (placeholder - you'd want to calculate actual growth from historical data)
-      const companiesGrowth = 12; // 12% growth
-      const attorneysGrowth = 7; // 7% growth
-      const clientsGrowth = 7; // 7% growth
+      const companiesGrowth = 12;
+      const attorneysGrowth = 7;
+      const clientsGrowth = 7;
 
-      // Calculate company distribution by size
+      // Company distribution
       const distribution = calculateCompanyDistribution(lawFirms);
       setCompanyDistribution(distribution);
 
-      // Get recent signups (last 4 law firms)
+      // Recent signups
       const recentSignupsData = getRecentSignups(lawFirms);
       setRecentSignups(recentSignupsData);
+
+      // Generate storage data (mock, replace with real API call when available)
+      const storageData = generateStorageData(lawFirms);
+      setCompanyStorage(storageData);
+
+      // Calculate storage totals
+      const totalStorageUsed = storageData.reduce((sum, item) => sum + item.storageUsed, 0);
+      const totalDocuments = storageData.reduce((sum, item) => sum + item.documentCount, 0);
+      const avgStorage = totalCompanies > 0 ? totalStorageUsed / totalCompanies : 0;
+      const topCompany = storageData.reduce((max, item) => item.storageUsed > max.storageUsed ? item : max, storageData[0] || { storageUsed: 0, name: '' });
 
       setStats({
         totalCompanies,
@@ -125,9 +153,18 @@ export function Dashboard() {
         companiesGrowth,
         attorneysGrowth,
         clientsGrowth,
+        totalStorageUsed,
+        totalDocuments,
       });
 
-      // For demo purposes, update the last month's data with current numbers
+      setStorageSummary({
+        totalStorageGB: totalStorageUsed / 1024,
+        avgStorageGB: avgStorage / 1024,
+        topConsumer: topCompany.name || 'N/A',
+        topStorageGB: topCompany.storageUsed / 1024,
+      });
+
+      // Update chart last month with real data
       const updatedGrowthData = [...monthlyGrowthData];
       const lastIndex = updatedGrowthData.length - 1;
       updatedGrowthData[lastIndex] = {
@@ -157,6 +194,7 @@ export function Dashboard() {
     }
   };
 
+  // Helper functions (calculateCompanyDistribution, getRecentSignups, getFirmType, getPlan, formatDate, formatNumber) remain the same
   const calculateCompanyDistribution = (firms: LawFirm[]): CompanyDistributionData[] => {
     const distribution = [
       { category: 'Small (1-10)', count: 0, percentage: 0 },
@@ -167,18 +205,12 @@ export function Dashboard() {
 
     firms.forEach(firm => {
       const memberCount = firm.member_count || 0;
-      if (memberCount <= 10) {
-        distribution[0].count++;
-      } else if (memberCount <= 50) {
-        distribution[1].count++;
-      } else if (memberCount <= 200) {
-        distribution[2].count++;
-      } else {
-        distribution[3].count++;
-      }
+      if (memberCount <= 10) distribution[0].count++;
+      else if (memberCount <= 50) distribution[1].count++;
+      else if (memberCount <= 200) distribution[2].count++;
+      else distribution[3].count++;
     });
 
-    // Calculate percentages
     const total = firms.length;
     distribution.forEach(item => {
       item.percentage = total > 0 ? Math.round((item.count / total) * 100) : 0;
@@ -188,7 +220,6 @@ export function Dashboard() {
   };
 
   const getRecentSignups = (firms: LawFirm[]): RecentSignup[] => {
-    // Sort by joined_date descending and take first 4
     const sortedFirms = [...firms]
       .sort((a, b) => new Date(b.joined_date).getTime() - new Date(a.joined_date).getTime())
       .slice(0, 4);
@@ -198,14 +229,13 @@ export function Dashboard() {
       name: firm.name,
       type: getFirmType(firm),
       attorneys: firm.member_count || 0,
-      clients: firm.case_count || 0, // Using case_count as proxy for clients
+      clients: firm.case_count || 0,
       signupDate: formatDate(firm.joined_date),
       plan: getPlan(firm.member_count || 0),
     }));
   };
 
   const getFirmType = (firm: LawFirm): string => {
-    // In a real app, you might have firm types in your database
     const types = ['Corporate Law', 'Intellectual Property', 'Family Law', 'Real Estate', 'Criminal Law', 'Immigration Law'];
     return types[firm.id % types.length];
   };
@@ -227,12 +257,25 @@ export function Dashboard() {
   };
 
   const formatNumber = (num: number): string => {
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`;
-    }
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
   };
 
+  // New function to generate mock storage data
+  const generateStorageData = (firms: LawFirm[]): CompanyStorage[] => {
+    return firms
+      .map(firm => ({
+        id: firm.id,
+        name: firm.name,
+        storageUsed: Math.floor(Math.random() * 5000) + 100, // 100–5100 MB
+        documentCount: Math.floor(Math.random() * 2000) + 50,
+        plan: getPlan(firm.member_count || 0),
+      }))
+      .sort((a, b) => b.storageUsed - a.storageUsed) // descending by storage
+      .slice(0, 10); // show top 10
+  };
+
+  // Stat items for top cards
   const statItems = [
     {
       title: 'Total Companies',
@@ -282,6 +325,7 @@ export function Dashboard() {
 
   return (
     <div className="p-8 space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h1>
@@ -295,7 +339,7 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Stats Grid */}
+      {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statItems.map((stat) => {
           const Icon = stat.icon;
@@ -352,15 +396,8 @@ export function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthlyGrowthData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="month"
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
-                  <YAxis
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
+                  <XAxis dataKey="month" className="text-muted-foreground text-xs" stroke="currentColor" />
+                  <YAxis className="text-muted-foreground text-xs" stroke="currentColor" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
@@ -369,41 +406,14 @@ export function Dashboard() {
                       color: 'hsl(var(--foreground))'
                     }}
                     formatter={(value: any, name: string | undefined) => {
-                      const metricNames: Record<string, string> = {
-                        companies: 'Companies',
-                        attorneys: 'Attorneys',
-                        clients: 'Clients',
-                      };
-                      const displayName = name ? metricNames[name] || name : 'Unknown';
-                      return [value, displayName];
+                      const metricNames: Record<string, string> = { companies: 'Companies', attorneys: 'Attorneys', clients: 'Clients' };
+                      return [value, metricNames[name as string] || name];
                     }}
                   />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="companies"
-                    name="Companies"
-                    stroke="#8B5CF6"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="attorneys"
-                    name="Attorneys"
-                    stroke="#3B82F6"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="clients"
-                    name="Clients"
-                    stroke="#10B981"
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
+                  <Line type="monotone" dataKey="companies" name="Companies" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="attorneys" name="Attorneys" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="clients" name="Clients" stroke="#10B981" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -421,15 +431,8 @@ export function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={companyDistribution}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="category"
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
-                  <YAxis
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
+                  <XAxis dataKey="category" className="text-muted-foreground text-xs" stroke="currentColor" />
+                  <YAxis className="text-muted-foreground text-xs" stroke="currentColor" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
@@ -444,18 +447,8 @@ export function Dashboard() {
                     }}
                   />
                   <Legend />
-                  <Bar
-                    dataKey="count"
-                    name="Number of Companies"
-                    fill="#8B5CF6"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="percentage"
-                    name="Percentage"
-                    fill="#3B82F6"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Bar dataKey="count" name="Number of Companies" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="percentage" name="Percentage" fill="#3B82F6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -463,7 +456,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Additional Charts and Recent Signups */}
+      {/* Client Growth and Recent Signups */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Client Growth Chart */}
         <Card>
@@ -476,15 +469,8 @@ export function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={clientGrowthData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis
-                    dataKey="month"
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
-                  <YAxis
-                    className="text-muted-foreground text-xs"
-                    stroke="currentColor"
-                  />
+                  <XAxis dataKey="month" className="text-muted-foreground text-xs" stroke="currentColor" />
+                  <YAxis className="text-muted-foreground text-xs" stroke="currentColor" />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: 'hsl(var(--background))',
@@ -493,15 +479,7 @@ export function Dashboard() {
                       color: 'hsl(var(--foreground))'
                     }}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="clients"
-                    name="Total Clients"
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
+                  <Area type="monotone" dataKey="clients" name="Total Clients" stroke="#10B981" fill="#10B981" fillOpacity={0.2} strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -556,14 +534,7 @@ export function Dashboard() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <div className="mb-2">
-                          <Badge
-                            variant={
-                              company.plan === 'Enterprise' ? 'default' :
-                                company.plan === 'Large' ? 'secondary' :
-                                  company.plan === 'Professional' ? 'warning' :
-                                    'default'
-                            }
-                          >
+                          <Badge variant={company.plan === 'Enterprise' ? 'default' : company.plan === 'Large' ? 'secondary' : company.plan === 'Professional' ? 'warning' : 'default'}>
                             {company.plan}
                           </Badge>
                         </div>
@@ -578,7 +549,89 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Summary Stats */}
+      {/* NEW ROW: Storage Statistics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Storage Usage by Company Table (span 2 columns) */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Storage Usage by Company</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Top 10 companies by document storage consumption</p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Company</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Plan</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Documents</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Storage Used</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companyStorage.map(company => (
+                    <tr key={company.id} className="border-b border-border last:border-0">
+                      <td className="py-3 px-4 text-sm text-foreground">{company.name}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <Badge variant={company.plan === 'Enterprise' ? 'default' : company.plan === 'Large' ? 'secondary' : company.plan === 'Professional' ? 'warning' : 'default'}>
+                          {company.plan}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-right text-foreground">{company.documentCount.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-sm text-right text-foreground">
+                        {company.storageUsed >= 1024
+                          ? `${(company.storageUsed / 1024).toFixed(1)} GB`
+                          : `${company.storageUsed} MB`}
+                      </td>
+                    </tr>
+                  ))}
+                  {companyStorage.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-muted-foreground">No storage data available</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Storage Summary Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Storage Overview</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Aggregated storage metrics</p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <HardDrive className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{storageSummary.totalStorageGB.toFixed(1)} GB</p>
+                <p className="text-sm text-muted-foreground">Total storage used</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Avg per company</p>
+                <p className="text-xl font-semibold text-foreground">{storageSummary.avgStorageGB.toFixed(1)} GB</p>
+              </div>
+              <div className="bg-muted/30 p-4 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Total documents</p>
+                <p className="text-xl font-semibold text-foreground">{stats.totalDocuments.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground mb-2">Top consumer</p>
+              <p className="font-medium text-foreground">{storageSummary.topConsumer || 'N/A'}</p>
+              <p className="text-sm text-muted-foreground">{storageSummary.topStorageGB.toFixed(1)} GB used</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Summary Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6">

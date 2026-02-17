@@ -83,7 +83,7 @@ export function UserSettings() {
       console.log('Users data received:', usersData);
       
       const filteredUsers = usersData.filter((user: UserType) => 
-        user.role === 'associate'  // OR: user.role !== 'client' for both admins and associates
+        user.role === 'associate' || user.role === 'admin' // OR: user.role !== 'client' for both admins and associates
       );
       
       console.log('Filtered users (associates only):', filteredUsers);

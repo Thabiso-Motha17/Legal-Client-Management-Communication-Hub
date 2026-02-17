@@ -92,6 +92,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
 
       // Prepare login data
       const loginData: LoginCredentials = {
+        role,
         email: email.trim(),
         password: password.trim()
       };
