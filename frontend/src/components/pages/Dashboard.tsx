@@ -21,7 +21,6 @@ interface CompanyDistributionData {
 interface RecentSignup {
   id: number;
   name: string;
-  type: string;
   attorneys: number;
   signupDate: string;
   plan: string;
@@ -52,16 +51,7 @@ export function Dashboard() {
     { category: 'Large (51-200)', count: 0, percentage: 0 },
     { category: 'Enterprise (200+)', count: 0, percentage: 0 },
   ]);
-  const [monthlyGrowthData, setMonthlyGrowthData] = useState<MonthlyGrowthData[]>([
-    { month: 'Jul', companies: 45, attorneys: 320 },
-    { month: 'Aug', companies: 52, attorneys: 380 },
-    { month: 'Sep', companies: 58, attorneys: 420 },
-    { month: 'Oct', companies: 64, attorneys: 480 },
-    { month: 'Nov', companies: 70, attorneys: 520 },
-    { month: 'Dec', companies: 78, attorneys: 580 },
-    { month: 'Jan', companies: 85, attorneys: 620 },
-  ]);
-
+  const [monthlyGrowthData, setMonthlyGrowthData] = useState<MonthlyGrowthData[]>([]);
   const [companyStorage, setCompanyStorage] = useState<CompanyStorage[]>([]);
   const [storageSummary, setStorageSummary] = useState({
     totalStorageGB: 0,
@@ -94,7 +84,7 @@ export function Dashboard() {
       const totalCompanies = lawFirms.length;
       const totalAttorneys = users.filter(u => u.role === 'admin' || u.role === 'associate').length;
 
-      // ---- Growth calculations (based on last 30 days) ----
+      // ---- Growth calculations (last 30 days) ----
       const now = new Date();
       const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
 
@@ -103,6 +93,45 @@ export function Dashboard() {
 
       const companiesGrowth = totalCompanies ? Math.round((newCompanies / totalCompanies) * 100) : 0;
       const attorneysGrowth = totalAttorneys ? Math.round((newAttorneys / totalAttorneys) * 100) : 0;
+
+      // ---- Monthly growth (for chart) ----
+      const monthlyMap = new Map<string, { companies: number; attorneys: number }>();
+
+      // Aggregate law firms by month
+      lawFirms.forEach(firm => {
+        const date = new Date(firm.joined_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const entry = monthlyMap.get(monthKey) || { companies: 0, attorneys: 0 };
+        entry.companies += 1;
+        monthlyMap.set(monthKey, entry);
+      });
+
+      // Aggregate attorneys (admin/associate) by month
+      users.forEach(user => {
+        if (user.role === 'admin' || user.role === 'associate') {
+          const date = new Date(user.created_at);
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const entry = monthlyMap.get(monthKey) || { companies: 0, attorneys: 0 };
+          entry.attorneys += 1;
+          monthlyMap.set(monthKey, entry);
+        }
+      });
+
+      // Convert map to sorted array and format month labels
+      const sortedMonths = Array.from(monthlyMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => {
+          const [year, month] = key.split('-');
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          return {
+            month: monthNames[parseInt(month) - 1],
+            year,
+            companies: value.companies,
+            attorneys: value.attorneys,
+          };
+        });
+
+      setMonthlyGrowthData(sortedMonths);
 
       // ---- Company distribution by attorney count ----
       const attorneysPerFirm = new Map<number, number>();
@@ -133,7 +162,7 @@ export function Dashboard() {
       });
       setCompanyDistribution(distribution);
 
-      // ---- Recent signups ----
+      // ---- Recent signups (without type) ----
       const recent = lawFirms
         .sort((a, b) => new Date(b.joined_date).getTime() - new Date(a.joined_date).getTime())
         .slice(0, 4)
@@ -143,7 +172,6 @@ export function Dashboard() {
           return {
             id: firm.id,
             name: firm.name,
-            type: getFirmType(firm),
             attorneys: attorneyCount,
             signupDate: formatDate(firm.joined_date),
             plan,
@@ -201,16 +229,6 @@ export function Dashboard() {
         topStorageGB: topCompany.storageUsed / 1024,
       });
 
-      // Update chart last month with real totals
-      const updatedGrowth = [...monthlyGrowthData];
-      const lastIdx = updatedGrowth.length - 1;
-      updatedGrowth[lastIdx] = {
-        ...updatedGrowth[lastIdx],
-        companies: totalCompanies,
-        attorneys: totalAttorneys,
-      };
-      setMonthlyGrowthData(updatedGrowth);
-
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
       alert('Error loading dashboard data');
@@ -220,11 +238,6 @@ export function Dashboard() {
   };
 
   // Helper functions
-  const getFirmType = (firm: LawFirm): string => {
-    const types = ['Corporate Law', 'Intellectual Property', 'Family Law', 'Real Estate', 'Criminal Law', 'Immigration Law'];
-    return types[firm.id % types.length];
-  };
-
   const getPlan = (memberCount: number): string => {
     if (memberCount >= 200) return 'Enterprise';
     if (memberCount >= 50) return 'Large';
@@ -296,7 +309,7 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Stats Cards (now only two) */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {statItems.map((stat) => {
           const Icon = stat.icon;
@@ -332,14 +345,14 @@ export function Dashboard() {
 
       {/* Growth Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Growth Chart (now only companies and attorneys) */}
+        {/* Monthly Growth Chart (real data) */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Monthly Growth Overview</CardTitle>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>Jul 2025 - Jan 2026</span>
+                <span>Based on actual signups</span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-1">System growth across key metrics</p>
@@ -385,7 +398,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent Signups (now without client count) */}
+      {/* Recent Signups (no type) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -416,7 +429,6 @@ export function Dashboard() {
                           </div>
                           <div>
                             <p className="font-medium text-foreground">{company.name}</p>
-                            <p className="text-sm text-muted-foreground">{company.type}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-6 text-sm">
@@ -443,7 +455,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Storage Statistics Card (unchanged) */}
+        {/* Storage Overview */}
         <Card>
           <CardHeader>
             <CardTitle>Storage Overview</CardTitle>
@@ -478,7 +490,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Storage Usage Table (unchanged) */}
+      {/* Storage Usage Table */}
       <Card>
         <CardHeader>
           <CardTitle>Storage Usage by Company</CardTitle>
@@ -523,7 +535,7 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Summary Stats (now only two cards) */}
+      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardContent className="p-6">
