@@ -9,6 +9,7 @@ import { Profile } from './components/pages/Profile';
 import { AssociateLayout } from './components/attorney/AttorneyLayout';
 import { UserSettings } from './components/pages/Users';
 import { useEffect, useState } from 'react';
+import { Welcome } from './components/pages/Welcome';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles = [] }: { 
@@ -145,7 +146,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Welcome />} />
+        <Route path="/login" element={<Login />} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={
