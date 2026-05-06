@@ -21,10 +21,56 @@ import {
 import type { Document, CreateDocumentData, Case } from '../../types/Types';
 import { API_URL } from '../../api';
 
+// Categorized document types
+const documentCategories: Record<string, string[]> = {
+  'Personal Injury': [
+    'Hospital Record',
+    'Expert Report',
+    'Accident Report & Dockets',
+    'RAF Forms',
+    'Notices',
+    'Pleadings',
+    'Correspondences',
+    'Client Information',
+    'Court Orders',
+    'Receipt',
+  ],
+  'Divorce': [
+    'Client Information',
+    'Pleadings',
+    'Notices',
+    'Correspondences',
+    'Receipts',
+    'Divorce Forms',
+  ],
+  'Estate': [
+    'Estate Forms',
+    'Correspondences',
+    'Letter of Executorship',
+    'Letter of Authority',
+  ],
+  'General Litigation': [
+    'Pleadings',
+    'Notices',
+    'Correspondence',
+    'Other Documents',
+    'Receipts',
+  ],
+  'Local Government Matters': [
+    'Pleadings',
+    'Notices',
+    'Correspondences',
+    'Court Orders',
+    'Receipts',
+  ],
+};
+
+
 export function AssociateDocuments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCase, setFilterCase] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [cases, setCases] = useState<Case[]>([]);
@@ -46,6 +92,7 @@ export function AssociateDocuments() {
   const [newDocument, setNewDocument] = useState<{
     name: string;
     case_id: number;
+    document_category: string;
     document_type: string;
     description: string;
     status: string;
@@ -60,6 +107,7 @@ export function AssociateDocuments() {
   }>({
     name: '',
     case_id: 0,
+    document_category: '',
     document_type: '',
     description: '',
     status: 'Draft',
@@ -84,7 +132,6 @@ export function AssociateDocuments() {
     try {
       setLoading(true);
 
-      // Get token for authentication
       const token = localStorage.getItem('token');
       if (!token) {
         alert('Please login to continue');
@@ -92,12 +139,9 @@ export function AssociateDocuments() {
         return;
       }
 
-      // Fetch all company documents (not just user's)
       const docsResponse = await fetch(`${API_URL}/api/documents`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (docsResponse.ok) {
@@ -107,12 +151,9 @@ export function AssociateDocuments() {
         console.error('Failed to fetch documents:', docsResponse.status);
       }
 
-      // Fetch all company cases
       const casesResponse = await fetch(`${API_URL}/api/cases`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (casesResponse.ok) {
@@ -128,70 +169,56 @@ export function AssociateDocuments() {
     }
   };
 
-  const documentTypes = [
-    'Receipt',
-    'Letter',
-    'Pleadings',
-    'Correspondences',
-  ];
+  // Subtypes available for the selected category in the upload form
+  const availableSubTypes =
+    newDocument.document_category
+      ? documentCategories[newDocument.document_category] ?? []
+      : [];
 
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
-      // Search filter
       const matchesSearch =
         doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (doc.case_title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (doc.uploaded_by_name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
-      // Case filter
       const matchesCase = filterCase === 'all' || doc.case_id.toString() === filterCase;
-
-      // Type filter
       const matchesType = filterType === 'all' || doc.document_type === filterType;
 
-      // My Documents filter
+      // Category filter — stored as "Category > SubType" or fall back to checking prefix
+      const matchesCategory =
+        filterCategory === 'all' ||
+        (doc.document_type?.startsWith(filterCategory) ?? false);
+
       const matchesUser = !filterMyDocuments || doc.uploaded_by_user_id === currentUser.id;
 
-      // Date range filter
       let matchesDate = true;
       if (filterDateFrom || filterDateTo) {
         const docDate = new Date(doc.uploaded_at);
-
         if (filterDateFrom) {
           const fromDate = new Date(filterDateFrom);
           fromDate.setHours(0, 0, 0, 0);
-          if (docDate < fromDate) {
-            matchesDate = false;
-          }
+          if (docDate < fromDate) matchesDate = false;
         }
-
         if (filterDateTo) {
           const toDate = new Date(filterDateTo);
           toDate.setHours(23, 59, 59, 999);
-          if (docDate > toDate) {
-            matchesDate = false;
-          }
+          if (docDate > toDate) matchesDate = false;
         }
       }
 
-      return matchesSearch && matchesCase && matchesType && matchesUser && matchesDate;
+      return matchesSearch && matchesCase && matchesType && matchesCategory && matchesUser && matchesDate;
     });
-  }, [documents, searchQuery, filterCase, filterType, filterMyDocuments, filterDateFrom, filterDateTo, currentUser.id]);
+  }, [documents, searchQuery, filterCase, filterType, filterCategory, filterMyDocuments, filterDateFrom, filterDateTo, currentUser.id]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'Approved':
-        return 'success';
-      case 'Under Review':
-        return 'warning';
-      case 'Draft':
-        return 'secondary';
-      case 'Reference':
-        return 'default';
-      case 'Rejected':
-        return 'error';
-      default:
-        return 'default';
+      case 'Approved': return 'success';
+      case 'Under Review': return 'warning';
+      case 'Draft': return 'secondary';
+      case 'Reference': return 'default';
+      case 'Rejected': return 'error';
+      default: return 'default';
     }
   };
 
@@ -221,7 +248,6 @@ export function AssociateDocuments() {
     });
   };
 
-  // Helper function to convert File to base64
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -231,24 +257,19 @@ export function AssociateDocuments() {
     });
   };
 
-  // Handle file selection
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
-      // Check file size (25MB limit)
       if (file.size > 25 * 1024 * 1024) {
         alert('File size must be under 25MB');
         event.target.value = '';
         return;
       }
 
-      // Convert file to base64
       const base64 = await convertFileToBase64(file);
-
-      // Set file name from the file if name is empty
-      const documentName = newDocument.name || file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+      const documentName = newDocument.name || file.name.replace(/\.[^/.]+$/, '');
 
       setNewDocument({
         ...newDocument,
@@ -266,10 +287,9 @@ export function AssociateDocuments() {
     }
   };
 
-  // Handle document upload
   const handleUploadDocument = async () => {
-    if (!newDocument.case_id || !newDocument.document_type || !newDocument.file) {
-      alert('Please select a case, document type, and file');
+    if (!newDocument.case_id || !newDocument.document_category || !newDocument.document_type || !newDocument.file) {
+      alert('Please select a case, category, document type, and file');
       return;
     }
 
@@ -281,7 +301,6 @@ export function AssociateDocuments() {
     try {
       setUploading(true);
 
-      // Get token for authentication
       const token = localStorage.getItem('token');
       if (!token) {
         alert('Please login to continue');
@@ -289,11 +308,11 @@ export function AssociateDocuments() {
         return;
       }
 
-      // Prepare the document data for upload
+      // Store category + subtype as "Category > SubType" so it's recoverable
       const documentData: CreateDocumentData = {
         name: newDocument.name.trim(),
         case_id: newDocument.case_id,
-        document_type: newDocument.document_type,
+        document_type: `${newDocument.document_category} > ${newDocument.document_type}`,
         description: newDocument.description,
         status: newDocument.status as 'Draft' | 'Under Review' | 'Approved' | 'Rejected' | 'Reference',
         version: newDocument.version,
@@ -305,14 +324,6 @@ export function AssociateDocuments() {
         year: newDocument.year,
       };
 
-      console.log('Uploading document:', {
-        name: documentData.name,
-        file_name: documentData.file_name,
-        file_size: documentData.file_size,
-        file_data_preview: documentData.file_data?.substring(0, 50) + '...'
-      });
-
-      // Make the request directly with fetch
       const response = await fetch(`${API_URL}/api/documents`, {
         method: 'POST',
         headers: {
@@ -341,11 +352,11 @@ export function AssociateDocuments() {
     }
   };
 
-  // Reset upload form
   const resetUploadForm = () => {
     setNewDocument({
       name: '',
       case_id: 0,
+      document_category: '',
       document_type: '',
       description: '',
       status: 'Draft',
@@ -359,22 +370,18 @@ export function AssociateDocuments() {
       year: 0,
     });
 
-    // Reset file input
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = '';
-    }
+    if (fileInput) fileInput.value = '';
   };
 
-  // View document
   const handleViewDocument = async (document: Document) => {
     try {
       setViewingDocument(document);
 
-      // Check if it's a viewable file type
       const viewableTypes = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'txt'];
       const fileExtension = document.file_name.split('.').pop()?.toLowerCase() || '';
-      const isViewable = viewableTypes.includes(fileExtension) ||
+      const isViewable =
+        viewableTypes.includes(fileExtension) ||
         document.mime_type?.includes('pdf') ||
         document.mime_type?.includes('image');
 
@@ -382,47 +389,30 @@ export function AssociateDocuments() {
         const token = localStorage.getItem('token');
         const response = await fetch(`${API_URL}/api/documents/${document.id}/download`, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
 
-        // For images, show in modal
         if (document.mime_type?.includes('image')) {
           setImagePreviewUrl(url);
           setShowViewModal(true);
         } else {
-          // For PDFs and other viewable files, open in new tab
           window.open(url, '_blank');
-
-          // Clean up URL after a delay
-          setTimeout(() => {
-            try {
-              window.URL.revokeObjectURL(url);
-            } catch (e) {
-              // Ignore errors
-            }
-          }, 30000); // Keep URL alive longer for large files
+          setTimeout(() => { try { window.URL.revokeObjectURL(url); } catch (e) {} }, 30000);
         }
       } else {
-        // For non-viewable files, show details modal
         setShowViewModal(true);
       }
     } catch (error: any) {
       console.error('Error viewing document:', error);
-      // If viewing fails, just show the details modal
       setShowViewModal(true);
     }
   };
 
-  // Download document
   const handleDownloadDocument = async (documentId: number, fileName: string) => {
     try {
       setDownloadingDocumentId(documentId);
@@ -430,9 +420,7 @@ export function AssociateDocuments() {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/documents/${documentId}/download`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (!response.ok) {
@@ -440,39 +428,26 @@ export function AssociateDocuments() {
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      // Get filename from Content-Disposition header or use provided filename
       const contentDisposition = response.headers.get('Content-Disposition');
       let downloadFileName = fileName;
 
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename\*?=["']?([^"';]+)["']?/);
-        if (filenameMatch && filenameMatch[1]) {
-          // Decode URI encoded filename
+        if (filenameMatch?.[1]) {
           downloadFileName = decodeURIComponent(filenameMatch[1]);
         } else {
-          // Try to get filename without encoding
           const simpleMatch = contentDisposition.match(/filename=["']?([^"';]+)["']?/);
-          if (simpleMatch && simpleMatch[1]) {
-            downloadFileName = simpleMatch[1];
-          }
+          if (simpleMatch?.[1]) downloadFileName = simpleMatch[1];
         }
       }
 
-      // Get the blob from response
       const blob = await response.blob();
+      if (blob.size === 0) throw new Error('Received empty file');
 
-      // Check if blob is valid
-      if (blob.size === 0) {
-        throw new Error('Received empty file');
-      }
-
-      // Check if it's a PDF by blob type or extension
       const isPDF = blob.type === 'application/pdf' || downloadFileName.toLowerCase().endsWith('.pdf');
 
-      // For PDFs, ask user if they want to open or download
       if (isPDF) {
         const userWantsToOpen = window.confirm('Do you want to open the PDF in a new tab instead of downloading?');
-
         if (userWantsToOpen) {
           const url = window.URL.createObjectURL(blob);
           window.open(url, '_blank');
@@ -482,23 +457,15 @@ export function AssociateDocuments() {
         }
       }
 
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = downloadFileName;
       a.style.display = 'none';
-
-      // Add to document, click, and remove
       document.body.appendChild(a);
       a.click();
-
-      // Clean up
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-
-      console.log('File downloaded successfully:', downloadFileName);
-
     } catch (error: any) {
       console.error('Error downloading document:', error);
       alert(error.message || 'Failed to download document. Please try again.');
@@ -507,23 +474,17 @@ export function AssociateDocuments() {
     }
   };
 
-  // Delete document
   const handleDeleteDocument = async (documentId: number, documentName: string) => {
-    if (!window.confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) {
-      return;
-    }
+    if (!window.confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) return;
 
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_URL}/api/documents/${documentId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        // Remove document from state
         setDocuments(documents.filter(doc => doc.id !== documentId));
         alert('Document deleted successfully!');
       } else {
@@ -540,28 +501,34 @@ export function AssociateDocuments() {
     setSearchQuery('');
     setFilterCase('all');
     setFilterType('all');
+    setFilterCategory('all');
     setFilterMyDocuments(false);
     setFilterDateFrom('');
     setFilterDateTo('');
   };
 
-  // Helper function to get file icon based on type
   const getFileIcon = (fileName: string, mimeType?: string | null) => {
     const extension = fileName.split('.').pop()?.toLowerCase();
-
     if (mimeType?.includes('pdf')) return '📄';
     if (mimeType?.includes('word') || extension === 'doc' || extension === 'docx') return '📝';
     if (mimeType?.includes('excel') || extension === 'xls' || extension === 'xlsx') return '📊';
     if (mimeType?.includes('image')) return '🖼️';
     if (extension === 'txt') return '📃';
-
     return '📎';
   };
 
-  // Helper function to get case title
   const getCaseTitle = (caseId: number) => {
     const caseItem = cases.find(c => c.id === caseId);
     return caseItem ? `${caseItem.case_number} - ${caseItem.title}` : `Case ${caseId}`;
+  };
+
+  // Helper: split stored "Category > SubType" for display
+  const parseDocumentType = (raw: string) => {
+    if (raw?.includes(' > ')) {
+      const [cat, sub] = raw.split(' > ');
+      return { category: cat, subType: sub };
+    }
+    return { category: '', subType: raw };
   };
 
   if (loading) {
@@ -591,11 +558,7 @@ export function AssociateDocuments() {
           <h1 className="text-foreground mb-2">Company Documents</h1>
           <p className="text-muted-foreground">Manage all company documents and work product</p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => setShowUploadModal(true)}
-          className="gap-2"
-        >
+        <Button variant="primary" onClick={() => setShowUploadModal(true)} className="gap-2">
           <Upload className="w-4 h-4" />
           Upload Document
         </Button>
@@ -654,11 +617,7 @@ export function AssociateDocuments() {
                 >
                   <Filter className="w-4 h-4" />
                   Advanced Filters
-                  {showAdvancedFilters ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
+                  {showAdvancedFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
                 <Button
                   variant="ghost"
@@ -692,7 +651,22 @@ export function AssociateDocuments() {
                     </select>
                   </div>
 
-                  {/* Type Filter */}
+                  {/* Category Filter */}
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Category</label>
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => { setFilterCategory(e.target.value); setFilterType('all'); }}
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                    >
+                      <option value="all">All Categories</option>
+                      {Object.keys(documentCategories).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Document Type Filter */}
                   <div>
                     <label className="block mb-2 text-sm text-foreground">Document Type</label>
                     <select
@@ -701,9 +675,18 @@ export function AssociateDocuments() {
                       className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                     >
                       <option value="all">All Types</option>
-                      {documentTypes.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
+                      {filterCategory !== 'all'
+                        ? documentCategories[filterCategory].map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))
+                        : Object.entries(documentCategories).map(([cat, types]) => (
+                            <optgroup key={cat} label={cat}>
+                              {types.map(type => (
+                                <option key={`${cat}-${type}`} value={type}>{type}</option>
+                              ))}
+                            </optgroup>
+                          ))
+                      }
                     </select>
                   </div>
 
@@ -752,7 +735,7 @@ export function AssociateDocuments() {
             )}
 
             {/* Active Filters Display */}
-            {(searchQuery || filterCase !== 'all' || filterType !== 'all' || filterMyDocuments || filterDateFrom || filterDateTo) && (
+            {(searchQuery || filterCase !== 'all' || filterType !== 'all' || filterCategory !== 'all' || filterMyDocuments || filterDateFrom || filterDateTo) && (
               <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                 <span className="text-sm text-muted-foreground self-center">Active filters:</span>
                 {searchQuery && (
@@ -767,6 +750,14 @@ export function AssociateDocuments() {
                   <Badge variant="default" className="gap-1">
                     Case: {cases.find(c => c.id.toString() === filterCase)?.case_number || filterCase}
                     <button onClick={() => setFilterCase('all')} className="ml-1 hover:text-destructive">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+                {filterCategory !== 'all' && (
+                  <Badge variant="default" className="gap-1">
+                    Category: {filterCategory}
+                    <button onClick={() => { setFilterCategory('all'); setFilterType('all'); }} className="ml-1 hover:text-destructive">
                       <X className="w-3 h-3" />
                     </button>
                   </Badge>
@@ -819,10 +810,7 @@ export function AssociateDocuments() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setShowUploadModal(false);
-                    resetUploadForm();
-                  }}
+                  onClick={() => { setShowUploadModal(false); resetUploadForm(); }}
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -830,6 +818,7 @@ export function AssociateDocuments() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* Case */}
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Case *</label>
                   <select
@@ -847,21 +836,43 @@ export function AssociateDocuments() {
                   </select>
                 </div>
 
+                {/* Category */}
                 <div>
-                  <label className="block mb-2 text-sm text-foreground">Document Type *</label>
+                  <label className="block mb-2 text-sm text-foreground">Category *</label>
                   <select
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.document_type}
-                    onChange={(e) => setNewDocument({ ...newDocument, document_type: e.target.value })}
+                    value={newDocument.document_category}
+                    onChange={(e) =>
+                      setNewDocument({ ...newDocument, document_category: e.target.value, document_type: '' })
+                    }
                     required
                   >
-                    <option value="">Select type...</option>
-                    {documentTypes.map(type => (
-                      <option key={type} value={type}>{type}</option>
+                    <option value="">Select a category...</option>
+                    {Object.keys(documentCategories).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* Document Type — only shown after category is chosen */}
+                {newDocument.document_category && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Document Type *</label>
+                    <select
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={newDocument.document_type}
+                      onChange={(e) => setNewDocument({ ...newDocument, document_type: e.target.value })}
+                      required
+                    >
+                      <option value="">Select document type...</option>
+                      {availableSubTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Document Name */}
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Document Name *</label>
                   <select
@@ -870,15 +881,16 @@ export function AssociateDocuments() {
                     onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
                     required
                   >
-                    <option value="">Select document type</option>
+                    <option value="">Select document name</option>
                     <option value="Payment to sheriff">Payment to sheriff</option>
                     <option value="Payment from Client">Payment from Client</option>
                   </select>
                   <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
                 </div>
 
+                {/* Year */}
                 <div>
-                  <label className="block mb-2 text-sm text-foreground">Year:</label>
+                  <label className="block mb-2 text-sm text-foreground">Year</label>
                   <input
                     type="number"
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
@@ -886,10 +898,7 @@ export function AssociateDocuments() {
                     onChange={(e) => {
                       const value = e.target.value;
                       if (value === '' || (value.length <= 4 && /^\d+$/.test(value))) {
-                        setNewDocument({
-                          ...newDocument,
-                          year: value === '' ? '' : parseInt(value)
-                        });
+                        setNewDocument({ ...newDocument, year: value === '' ? '' : parseInt(value) });
                       }
                     }}
                     max="9999"
@@ -897,6 +906,7 @@ export function AssociateDocuments() {
                   />
                 </div>
 
+                {/* File Upload */}
                 <div>
                   <label className="block mb-2 text-sm text-foreground">File *</label>
                   <input
@@ -928,6 +938,7 @@ export function AssociateDocuments() {
                   </label>
                 </div>
 
+                {/* Description */}
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
                   <textarea
@@ -960,10 +971,7 @@ export function AssociateDocuments() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setShowUploadModal(false);
-                      resetUploadForm();
-                    }}
+                    onClick={() => { setShowUploadModal(false); resetUploadForm(); }}
                   >
                     Cancel
                   </Button>
@@ -984,26 +992,19 @@ export function AssociateDocuments() {
                   <span className="text-2xl">{getFileIcon(viewingDocument.file_name, viewingDocument.mime_type)}</span>
                   <div>
                     <div className="text-lg">{viewingDocument.name}</div>
-                    <div className="text-sm text-muted-foreground font-normal">
-                      {viewingDocument.file_name}
-                    </div>
+                    <div className="text-sm text-muted-foreground font-normal">{viewingDocument.file_name}</div>
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setViewingDocument(null);
-                    setImagePreviewUrl(null);
-                  }}
+                  onClick={() => { setShowViewModal(false); setViewingDocument(null); setImagePreviewUrl(null); }}
                 >
                   <X className="w-4 h-4" />
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Document Preview Section */}
               {imagePreviewUrl && (
                 <div className="border border-border rounded-lg p-4">
                   <div className="text-sm text-muted-foreground mb-2">Image Preview:</div>
@@ -1012,35 +1013,24 @@ export function AssociateDocuments() {
                       src={imagePreviewUrl}
                       alt={viewingDocument.name}
                       className="max-w-full max-h-[400px] object-contain"
-                      onError={(e) => {
-                        // Fallback if image fails to load
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.innerHTML = `
-                          <div class="text-center p-8">
-                            <FileText class="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                            <p class="text-sm text-muted-foreground">
-                              Unable to display image preview
-                            </p>
-                            <p class="text-xs text-muted-foreground mt-1">
-                              File type: ${viewingDocument.mime_type}
-                            </p>
-                          </div>
-                        `;
-                        }
-                      }}
                     />
                   </div>
                 </div>
               )}
 
-              {/* Document Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Category + Type */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Category</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">
+                    {parseDocumentType(viewingDocument.document_type).category || '—'}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Document Type</label>
                   <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.document_type}
+                    {parseDocumentType(viewingDocument.document_type).subType || viewingDocument.document_type}
                   </div>
                 </div>
 
@@ -1075,7 +1065,7 @@ export function AssociateDocuments() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Year:</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Year</label>
                   <div className="px-3 py-2 bg-input-background rounded border border-border">
                     {viewingDocument.year || 'Unknown'}
                   </div>
@@ -1112,7 +1102,6 @@ export function AssociateDocuments() {
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-4 border-t border-border">
                 <Button
                   variant="primary"
@@ -1132,11 +1121,7 @@ export function AssociateDocuments() {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setViewingDocument(null);
-                    setImagePreviewUrl(null);
-                  }}
+                  onClick={() => { setShowViewModal(false); setViewingDocument(null); setImagePreviewUrl(null); }}
                 >
                   Close
                 </Button>
@@ -1161,14 +1146,10 @@ export function AssociateDocuments() {
             <div className="px-6 py-12 text-center">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No documents found</p>
-              {searchQuery || filterCase !== 'all' || filterType !== 'all' || filterMyDocuments || filterDateFrom || filterDateTo ? (
+              {searchQuery || filterCase !== 'all' || filterType !== 'all' || filterCategory !== 'all' || filterMyDocuments || filterDateFrom || filterDateTo ? (
                 <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filter</p>
               ) : (
-                <Button
-                  variant="outline"
-                  className="mt-4 gap-2"
-                  onClick={() => setShowUploadModal(true)}
-                >
+                <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowUploadModal(true)}>
                   <Upload className="w-4 h-4" />
                   Upload Your First Document
                 </Button>
@@ -1176,103 +1157,96 @@ export function AssociateDocuments() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {filteredDocuments.map((doc) => (
-                <div key={doc.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {/* File Icon */}
-                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xl">
-                        {getFileIcon(doc.file_name, doc.mime_type)}
-                      </span>
-                    </div>
+              {filteredDocuments.map((doc) => {
+                const { category, subType } = parseDocumentType(doc.document_type);
+                return (
+                  <div key={doc.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xl">{getFileIcon(doc.file_name, doc.mime_type)}</span>
+                      </div>
 
-                    {/* Document Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="text-sm font-medium text-foreground truncate">{doc.name}</h3>
-                        <Badge variant={getStatusVariant(doc.status)}>
-                          {doc.status}
-                        </Badge>
-                        {doc.uploaded_by_user_id === currentUser.id && (
-                          <Badge variant="default" className="text-xs">My Upload</Badge>
-                        )}
-                        {doc.version > 1 && (
-                          <span className="text-xs text-muted-foreground">v{doc.version}</span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground mb-2">
-                        <div className="flex items-center gap-1">
-                          <Briefcase className="w-3 h-3" />
-                          <span className="truncate">{doc.case_title || getCaseTitle(doc.case_id)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="text-sm font-medium text-foreground truncate">{doc.name}</h3>
+                          <Badge variant={getStatusVariant(doc.status)}>{doc.status}</Badge>
+                          {doc.uploaded_by_user_id === currentUser.id && (
+                            <Badge variant="default" className="text-xs">My Upload</Badge>
+                          )}
+                          {doc.version > 1 && (
+                            <span className="text-xs text-muted-foreground">v{doc.version}</span>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>{formatDate(doc.uploaded_at)}</span>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground mb-2">
+                          <div className="flex items-center gap-1">
+                            <Briefcase className="w-3 h-3" />
+                            <span className="truncate">{doc.case_title || getCaseTitle(doc.case_id)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{formatDate(doc.uploaded_at)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            <span className={doc.uploaded_by_user_id === currentUser.id ? 'text-primary font-medium' : ''}>
+                              {doc.uploaded_by_name || 'Unknown'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>Year: {doc.year || 'N/A'}</span>
+                          </div>
+                          <div>
+                            <span>{formatFileSize(doc.file_size)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          <span className={doc.uploaded_by_user_id === currentUser.id ? "text-primary font-medium" : ""}>
-                            {doc.uploaded_by_name || 'Unknown'}
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          {category && (
+                            <span className="px-2 py-0.5 bg-primary/10 text-primary rounded font-medium">
+                              {category}
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 bg-muted rounded text-muted-foreground">
+                            {subType || doc.document_type}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span>year: {doc.year || 'N/A'}</span>
-                        </div>
-                        <div>
-                          <span>{formatFileSize(doc.file_size)}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="px-2 py-0.5 bg-muted rounded text-muted-foreground">
-                          {doc.document_type}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {doc.file_type || doc.mime_type?.split('/')[1] || 'Unknown'}
-                        </span>
-                        {doc.reviewer_user_id && (
                           <span className="text-muted-foreground">
-                            • Reviewer: {doc.reviewer_user_id}
+                            {doc.file_type || doc.mime_type?.split('/')[1] || 'Unknown'}
                           </span>
-                        )}
+                          {doc.reviewer_user_id && (
+                            <span className="text-muted-foreground">• Reviewer: {doc.reviewer_user_id}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => handleViewDocument(doc)}
-                      >
-                        <Eye className="w-4 h-4" />
-                        View
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownloadDocument(doc.id, doc.file_name)}
-                        disabled={downloadingDocumentId === doc.id}
-                        className="relative"
-                      >
-                        {downloadingDocumentId === doc.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteDocument(doc.id, doc.name)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button variant="outline" size="sm" className="gap-2" onClick={() => handleViewDocument(doc)}>
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadDocument(doc.id, doc.file_name)}
+                          disabled={downloadingDocumentId === doc.id}
+                        >
+                          {downloadingDocumentId === doc.id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

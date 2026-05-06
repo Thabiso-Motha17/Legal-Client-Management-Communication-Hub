@@ -23,6 +23,7 @@
   "homepage": "https://github.com/Thabiso-Motha17/Legal-Client-Management-Communication-Hub#readme",
   "dependencies": {
     "concurrently": "^9.2.1",
+    "firebase": "^12.12.1",
     "react-router-dom": "^7.12.0"
   }
 }

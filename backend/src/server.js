@@ -1585,7 +1585,6 @@ app.delete('/api/documents/:id', authenticateToken, async (req, res) => {
         error: 'Cannot delete document: Document is referenced by other records' 
       });
     }
-    
     res.status(500).json({ error: error.message });
   }
 });
