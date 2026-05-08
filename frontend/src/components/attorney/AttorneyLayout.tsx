@@ -25,6 +25,7 @@ import type{ User } from '../../types/Types';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
 import { AssociateCalendar } from './AssociateCalendar';
+import { AuditLogs } from './AuditLogs';
 
 interface AssociateLayoutProps {
   onLogout: () => void;
@@ -69,6 +70,7 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
   // Add settings only if user has full access permission
   const fullAccessNavigation = [
     ...baseNavigation,
+    {id: 'auditlogs', name: 'Audit Logs', icon: Shield},
     { id: 'settings', name: 'Settings', icon: Settings }
   ];
 
@@ -99,6 +101,13 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
           return <AttorneySettings />;
         } else {
           // Redirect to dashboard if unauthorized
+          setCurrentPage('dashboard');
+          return <AssociateDashboard onNavigate={setCurrentPage} />;
+        }
+      case 'auditlogs':
+        if (hasFullAccess) {
+          return <AuditLogs/>;
+        } else {
           setCurrentPage('dashboard');
           return <AssociateDashboard onNavigate={setCurrentPage} />;
         }
