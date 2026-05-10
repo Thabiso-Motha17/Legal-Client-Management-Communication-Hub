@@ -223,7 +223,6 @@ export function AssociateDocuments() {
 
   // Group: category → subType → docs[]
   const grouped = useMemo(() => {
-    // Pre-seed every known category so empty ones still render
     const map: Record<string, Record<string, Document[]>> = {};
     Object.keys(documentCategories).forEach(cat => { map[cat] = {}; });
     filteredDocuments.forEach(doc => {
@@ -262,8 +261,8 @@ export function AssociateDocuments() {
   };
 
   const handleUploadDocument = async () => {
-    if (!newDocument.case_id || !newDocument.document_category || !newDocument.document_type || !newDocument.file) {
-      alert('Please select a case, category, document type, and file'); return;
+    if (!newDocument.document_category || !newDocument.document_type || !newDocument.case_id || !newDocument.file) {
+      alert('Please select a category, document type, case, and file'); return;
     }
     if (!newDocument.name.trim()) { alert('Please enter a document name'); return; }
     try {
@@ -652,12 +651,10 @@ export function AssociateDocuments() {
                                     key={doc.id}
                                     className="flex items-center gap-4 pl-20 pr-5 py-3 hover:bg-muted/15 transition-colors"
                                   >
-                                    {/* File type icon */}
                                     <span className="text-lg flex-shrink-0">
                                       {getFileIcon(doc.file_name, doc.mime_type)}
                                     </span>
 
-                                    {/* File metadata */}
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap mb-1">
                                         <span className="text-sm font-medium text-foreground truncate">
@@ -693,7 +690,6 @@ export function AssociateDocuments() {
                                       </div>
                                     </div>
 
-                                    {/* Actions — View + Delete only (no download) */}
                                     <div className="flex items-center gap-2 flex-shrink-0">
                                       <Button
                                         variant="outline"
@@ -743,110 +739,151 @@ export function AssociateDocuments() {
             <CardContent>
               <div className="space-y-4">
 
-                <div>
-                  <label className="block mb-2 text-sm text-foreground">Case *</label>
-                  <select
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.case_id}
-                    onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}
-                  >
-                    <option value="0">Select a case...</option>
-                    {cases.map(c => <option key={c.id} value={c.id}>{c.case_number} - {c.title}</option>)}
-                  </select>
-                </div>
-
+                {/* STEP 1 — Category */}
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Category *</label>
                   <select
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.document_category}
-                    onChange={e => setNewDocument(p => ({ ...p, document_category: e.target.value, document_type: '' }))}
+                    onChange={e => setNewDocument(p => ({
+                      ...p,
+                      document_category: e.target.value,
+                      document_type: '',  // reset downstream fields
+                      case_id: 0,
+                    }))}
                   >
                     <option value="">Select a category...</option>
-                    {Object.keys(documentCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {Object.keys(documentCategories).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
 
+                {/* STEP 2 — Document Type (revealed after category) */}
                 {newDocument.document_category && (
                   <div>
                     <label className="block mb-2 text-sm text-foreground">Document Type *</label>
                     <select
                       className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                       value={newDocument.document_type}
-                      onChange={e => setNewDocument(p => ({ ...p, document_type: e.target.value }))}
+                      onChange={e => setNewDocument(p => ({
+                        ...p,
+                        document_type: e.target.value,
+                        case_id: 0, // reset downstream
+                      }))}
                     >
                       <option value="">Select document type...</option>
-                      {availableSubTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                      {availableSubTypes.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
                     </select>
                   </div>
                 )}
 
-                <div>
-                  <label className="block mb-2 text-sm text-foreground">Document Name *</label>
-                  <select
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.name}
-                    onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
-                  >
-                    <option value="">Select document name</option>
-                    <option value="Payment to sheriff">Payment to sheriff</option>
-                    <option value="Payment from Client">Payment from Client</option>
-                  </select>
-                  <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
-                </div>
+                {/* STEP 3 — Case (revealed after document type) */}
+                {newDocument.document_type && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Associated Case *</label>
+                    <select
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={newDocument.case_id}
+                      onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}
+                    >
+                      <option value="0">Select a case...</option>
+                      {cases.map(c => (
+                        <option key={c.id} value={c.id}>{c.case_number} - {c.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block mb-2 text-sm text-foreground">Year</label>
-                  <input
-                    type="number"
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.year}
-                    onChange={e => {
-                      const v = e.target.value;
-                      if (v === '' || (v.length <= 4 && /^\d+$/.test(v)))
-                        setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) }));
-                    }}
-                    max="9999" min="1000"
-                  />
-                </div>
+                {/* STEP 4 — Document Name (revealed after case) */}
+                {newDocument.case_id > 0 && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Document Name *</label>
+                    <select
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={newDocument.name}
+                      onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
+                    >
+                      <option value="">Select document name</option>
+                      <option value="Payment to sheriff">Payment to sheriff</option>
+                      <option value="Payment from Client">Payment from Client</option>
+                    </select>
+                    <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
+                  </div>
+                )}
 
-                <div>
-                  <label className="block mb-2 text-sm text-foreground">File *</label>
-                  <input type="file" onChange={handleFileSelect}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
-                    className="hidden" id="file-upload" />
-                  <label htmlFor="file-upload">
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                      {newDocument.file ? (
-                        <>
-                          <p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
-                          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p>
-                        </>
-                      )}
-                    </div>
-                  </label>
-                </div>
+                {/* STEP 5 — Year */}
+                {newDocument.case_id > 0 && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Year</label>
+                    <input
+                      type="number"
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={newDocument.year}
+                      onChange={e => {
+                        const v = e.target.value;
+                        if (v === '' || (v.length <= 4 && /^\d+$/.test(v)))
+                          setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) }));
+                      }}
+                      max="9999" min="1000"
+                    />
+                  </div>
+                )}
 
-                <div>
-                  <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
-                  <textarea
-                    placeholder="Add notes about this document..."
-                    rows={3}
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                    value={newDocument.description}
-                    onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))}
-                  />
-                </div>
+                {/* STEP 6 — File */}
+                {newDocument.case_id > 0 && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">File *</label>
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label htmlFor="file-upload">
+                      <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                        {newDocument.file ? (
+                          <>
+                            <p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
+                            <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
+                            <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p>
+                          </>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                )}
 
+                {/* STEP 7 — Description */}
+                {newDocument.case_id > 0 && (
+                  <div>
+                    <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
+                    <textarea
+                      placeholder="Add notes about this document..."
+                      rows={3}
+                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                      value={newDocument.description}
+                      onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))}
+                    />
+                  </div>
+                )}
+
+                {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="primary" className="gap-2" onClick={handleUploadDocument}
-                    disabled={uploading || !newDocument.file}>
+                  <Button
+                    variant="primary"
+                    className="gap-2"
+                    onClick={handleUploadDocument}
+                    disabled={uploading || !newDocument.file}
+                  >
                     {uploading
                       ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Uploading...</>
                       : <><Upload className="w-4 h-4" /> Upload Document</>}
@@ -855,6 +892,7 @@ export function AssociateDocuments() {
                     Cancel
                   </Button>
                 </div>
+
               </div>
             </CardContent>
           </Card>
