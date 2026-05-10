@@ -75,7 +75,7 @@ const categoryStyle: Record<string, { border: string; bg: string; text: string; 
   'General Litigation':       { border: 'border-l-rose-500',   bg: 'bg-rose-50 dark:bg-rose-950/20',    text: 'text-rose-700 dark:text-rose-400',    iconBg: 'bg-rose-100 dark:bg-rose-900/40'    },
   'Local Government Matters': { border: 'border-l-teal-500',   bg: 'bg-teal-50 dark:bg-teal-950/20',    text: 'text-teal-700 dark:text-teal-400',    iconBg: 'bg-teal-100 dark:bg-teal-900/40'    },
 };
-const fallbackStyle = { border: 'border-l-gray-400', bg: 'bg-gray-50', text: 'text-gray-700', iconBg: 'bg-gray-100' };
+const fallbackStyle = { border: 'border-l-gray-400', bg: 'bg-gray-50 dark:bg-gray-900/20', text: 'text-gray-700 dark:text-gray-400', iconBg: 'bg-gray-100 dark:bg-gray-800' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function AssociateDocuments() {
@@ -86,9 +86,10 @@ export function AssociateDocuments() {
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // accordion open state
+  // accordion open state — keyed by path string
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
   const [openTypes, setOpenTypes]           = useState<Record<string, boolean>>({});
+  const [openCases, setOpenCases]           = useState<Record<string, boolean>>({});
 
   // filters
   const [searchQuery, setSearchQuery]             = useState('');
@@ -176,7 +177,7 @@ export function AssociateDocuments() {
     return '📎';
   };
 
-  const getCaseTitle = (caseId: number) => {
+  const getCaseLabel = (caseId: number) => {
     const c = cases.find(c => c.id === caseId);
     return c ? `${c.case_number} - ${c.title}` : `Case ${caseId}`;
   };
@@ -200,7 +201,7 @@ export function AssociateDocuments() {
     approved:    documents.filter(d => d.status === 'Approved').length,
   };
 
-  // ── filtered + grouped ─────────────────────────────────────────────────────
+  // ── filtered documents ─────────────────────────────────────────────────────
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       const matchesSearch =
@@ -221,18 +222,24 @@ export function AssociateDocuments() {
     });
   }, [documents, searchQuery, filterCase, filterCategory, filterType, filterMyDocuments, filterDateFrom, filterDateTo, currentUser.id]);
 
-  // Group: category → subType → docs[]
+  // ── 4-level grouping: category → subType → caseId → docs[] ───────────────
   const grouped = useMemo(() => {
-    const map: Record<string, Record<string, Document[]>> = {};
+    // Pre-seed known categories so empty ones still appear
+    const map: Record<string, Record<string, Record<string, Document[]>>> = {};
     Object.keys(documentCategories).forEach(cat => { map[cat] = {}; });
+
     filteredDocuments.forEach(doc => {
       const { category, subType } = parseDocumentType(doc.document_type);
-      if (!map[category]) map[category] = {};
-      if (!map[category][subType]) map[category][subType] = [];
-      map[category][subType].push(doc);
+      const caseLabel = doc.case_title ?? getCaseLabel(doc.case_id);
+
+      if (!map[category])            map[category] = {};
+      if (!map[category][subType])   map[category][subType] = {};
+      if (!map[category][subType][caseLabel]) map[category][subType][caseLabel] = [];
+      map[category][subType][caseLabel].push(doc);
     });
+
     return map;
-  }, [filteredDocuments]);
+  }, [filteredDocuments, cases]);
 
   // ── accordion toggles ──────────────────────────────────────────────────────
   const toggleCategory = (cat: string) =>
@@ -241,6 +248,11 @@ export function AssociateDocuments() {
   const toggleType = (cat: string, type: string) => {
     const key = `${cat}||${type}`;
     setOpenTypes(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleCase = (cat: string, type: string, caseLabel: string) => {
+    const key = `${cat}||${type}||${caseLabel}`;
+    setOpenCases(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   // ── upload ─────────────────────────────────────────────────────────────────
@@ -261,8 +273,8 @@ export function AssociateDocuments() {
   };
 
   const handleUploadDocument = async () => {
-    if (!newDocument.document_category || !newDocument.document_type || !newDocument.case_id || !newDocument.file) {
-      alert('Please select a category, document type, case, and file'); return;
+    if (!newDocument.case_id || !newDocument.document_category || !newDocument.document_type || !newDocument.file) {
+      alert('Please select a case, category, document type, and file'); return;
     }
     if (!newDocument.name.trim()) { alert('Please enter a document name'); return; }
     try {
@@ -385,7 +397,7 @@ export function AssociateDocuments() {
   return (
     <div className="p-6 md:p-8 space-y-6">
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground mb-2">Company Documents</h1>
@@ -396,7 +408,7 @@ export function AssociateDocuments() {
         </Button>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────────────── */}
+      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Total Documents', value: stats.total,       color: 'text-foreground' },
@@ -413,11 +425,9 @@ export function AssociateDocuments() {
         ))}
       </div>
 
-      {/* ── Filters ─────────────────────────────────────────────────────────── */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-4 space-y-4">
-
-          {/* Search + toggle row */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -440,7 +450,6 @@ export function AssociateDocuments() {
             </div>
           </div>
 
-          {/* Advanced filter panel */}
           {showAdvancedFilters && (
             <div className="border-t pt-4 border-border space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -502,7 +511,6 @@ export function AssociateDocuments() {
             </div>
           )}
 
-          {/* Active filter chips */}
           {hasActiveFilters && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
               <span className="text-sm text-muted-foreground self-center">Active filters:</span>
@@ -547,7 +555,7 @@ export function AssociateDocuments() {
         </CardContent>
       </Card>
 
-      {/* ── Hierarchical Document Browser ─────────────────────────────────── */}
+      {/* ── 4-Level Hierarchical Browser ──────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -560,7 +568,6 @@ export function AssociateDocuments() {
 
         <CardContent className="p-4 space-y-3">
 
-          {/* Empty state */}
           {filteredDocuments.length === 0 && (
             <div className="py-16 text-center">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -576,140 +583,151 @@ export function AssociateDocuments() {
             </div>
           )}
 
-          {/* ── LEVEL 1: Category rows ─────────────────────────────────────── */}
+          {/* ── LEVEL 1: Category ─────────────────────────────────────────── */}
           {Object.entries(grouped).map(([category, typeMap]) => {
-            const totalInCat = Object.values(typeMap).flat().length;
+            const totalInCat = Object.values(typeMap).flatMap(t => Object.values(t)).flat().length;
             const isCatOpen  = !!openCategories[category];
             const cs         = categoryStyle[category] ?? fallbackStyle;
 
             return (
-              <div
-                key={category}
-                className={`rounded-xl border border-border border-l-4 ${cs.border} overflow-hidden shadow-sm`}
-              >
-                {/* Category header button */}
+              <div key={category} className={`rounded-xl border border-border border-l-4 ${cs.border} overflow-hidden shadow-sm`}>
+
+                {/* Category header */}
                 <button
                   onClick={() => toggleCategory(category)}
-                  className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors
-                    ${isCatOpen ? cs.bg : 'hover:bg-muted/30'}`}
+                  className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isCatOpen ? cs.bg : 'hover:bg-muted/30'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg ${cs.iconBg} flex items-center justify-center flex-shrink-0`}>
-                      {isCatOpen
-                        ? <FolderOpen className={`w-4 h-4 ${cs.text}`} />
-                        : <Folder     className={`w-4 h-4 ${cs.text}`} />}
+                      {isCatOpen ? <FolderOpen className={`w-4 h-4 ${cs.text}`} /> : <Folder className={`w-4 h-4 ${cs.text}`} />}
                     </div>
                     <span className={`font-semibold text-base ${cs.text}`}>{category}</span>
                     <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
                       {totalInCat} {totalInCat === 1 ? 'file' : 'files'}
                     </span>
                   </div>
-                  {isCatOpen
-                    ? <ChevronDown  className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+                  {isCatOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                 </button>
 
-                {/* ── LEVEL 2: Document-type rows ─────────────────────────── */}
+                {/* ── LEVEL 2: Document Type ──────────────────────────────── */}
                 {isCatOpen && (
                   <div className="border-t border-border divide-y divide-border/60">
-
                     {Object.keys(typeMap).length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic px-14 py-4">
-                        No documents in this category yet
-                      </p>
+                      <p className="text-sm text-muted-foreground italic px-14 py-4">No documents in this category yet</p>
                     ) : (
-                      Object.entries(typeMap).map(([docType, docs]) => {
+                      Object.entries(typeMap).map(([docType, caseMap]) => {
                         const typeKey    = `${category}||${docType}`;
                         const isTypeOpen = !!openTypes[typeKey];
+                        const totalInType = Object.values(caseMap).flat().length;
 
                         return (
                           <div key={docType} className="bg-muted/5">
 
-                            {/* Type header button */}
+                            {/* Type header */}
                             <button
                               onClick={() => toggleType(category, docType)}
-                              className="w-full flex items-center justify-between pl-14 pr-5 py-3 text-left
-                                hover:bg-muted/25 transition-colors"
+                              className="w-full flex items-center justify-between pl-14 pr-5 py-3 text-left hover:bg-muted/25 transition-colors"
                             >
                               <div className="flex items-center gap-3">
-                                {isTypeOpen
-                                  ? <ChevronDown  className="w-3.5 h-3.5 text-muted-foreground" />
-                                  : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                                {isTypeOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
                                 <FileText className="w-3.5 h-3.5 text-muted-foreground" />
                                 <span className="text-sm font-medium text-foreground">{docType}</span>
                                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                                  {docs.length} {docs.length === 1 ? 'file' : 'files'}
+                                  {totalInType} {totalInType === 1 ? 'file' : 'files'}
                                 </span>
                               </div>
                             </button>
 
-                            {/* ── LEVEL 3: File rows ──────────────────────── */}
+                            {/* ── LEVEL 3: Case ───────────────────────────── */}
                             {isTypeOpen && (
-                              <div className="border-t border-border/40 bg-background divide-y divide-border/30">
-                                {docs.map(doc => (
-                                  <div
-                                    key={doc.id}
-                                    className="flex items-center gap-4 pl-20 pr-5 py-3 hover:bg-muted/15 transition-colors"
-                                  >
-                                    <span className="text-lg flex-shrink-0">
-                                      {getFileIcon(doc.file_name, doc.mime_type)}
-                                    </span>
+                              <div className="border-t border-border/40 divide-y divide-border/30">
+                                {Object.entries(caseMap).map(([caseLabel, docs]) => {
+                                  const caseKey    = `${category}||${docType}||${caseLabel}`;
+                                  const isCaseOpen = !!openCases[caseKey];
 
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                                        <span className="text-sm font-medium text-foreground truncate">
-                                          {doc.name}
-                                        </span>
-                                        <Badge variant={getStatusVariant(doc.status)}>
-                                          {doc.status}
-                                        </Badge>
-                                        {doc.uploaded_by_user_id === currentUser.id && (
-                                          <Badge variant="default" className="text-xs">My Upload</Badge>
-                                        )}
-                                        {doc.version > 1 && (
-                                          <span className="text-xs text-muted-foreground">v{doc.version}</span>
-                                        )}
-                                      </div>
-                                      <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                          <Briefcase className="w-3 h-3" />
-                                          {doc.case_title ?? getCaseTitle(doc.case_id)}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                          <Calendar className="w-3 h-3" />
-                                          {formatDate(doc.uploaded_at)}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                          <User className="w-3 h-3" />
-                                          <span className={doc.uploaded_by_user_id === currentUser.id ? 'text-primary font-medium' : ''}>
-                                            {doc.uploaded_by_name ?? 'Unknown'}
+                                  return (
+                                    <div key={caseLabel} className="bg-muted/10">
+
+                                      {/* Case header */}
+                                      <button
+                                        onClick={() => toggleCase(category, docType, caseLabel)}
+                                        className="w-full flex items-center justify-between pl-20 pr-5 py-2.5 text-left hover:bg-muted/30 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {isCaseOpen ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+                                          <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                                          <span className="text-sm font-medium text-foreground">{caseLabel}</span>
+                                          <span className="text-xs text-muted-foreground bg-muted/80 px-1.5 py-0.5 rounded-full">
+                                            {docs.length} {docs.length === 1 ? 'file' : 'files'}
                                           </span>
-                                        </span>
-                                        {doc.year ? <span>Year: {doc.year}</span> : null}
-                                        <span>{formatFileSize(doc.file_size)}</span>
-                                      </div>
-                                    </div>
+                                        </div>
+                                      </button>
 
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-1.5"
-                                        onClick={() => handleViewDocument(doc)}
-                                      >
-                                        <Eye className="w-3.5 h-3.5" /> View
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={() => handleDeleteDocument(doc.id, doc.name)}
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
+                                      {/* ── LEVEL 4: Files ──────────────── */}
+                                      {isCaseOpen && (
+                                        <div className="border-t border-border/30 bg-background divide-y divide-border/20">
+                                          {docs.map(doc => (
+                                            <div
+                                              key={doc.id}
+                                              className="flex items-center gap-4 pl-28 pr-5 py-3 hover:bg-muted/15 transition-colors"
+                                            >
+                                              {/* File icon */}
+                                              <span className="text-lg flex-shrink-0">
+                                                {getFileIcon(doc.file_name, doc.mime_type)}
+                                              </span>
+
+                                              {/* File info */}
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                  <span className="text-sm font-medium text-foreground truncate">
+                                                    {doc.name}
+                                                  </span>
+                                                  <Badge variant={getStatusVariant(doc.status)}>
+                                                    {doc.status}
+                                                  </Badge>
+                                                  {doc.uploaded_by_user_id === currentUser.id && (
+                                                    <Badge variant="default" className="text-xs">My Upload</Badge>
+                                                  )}
+                                                  {doc.version > 1 && (
+                                                    <span className="text-xs text-muted-foreground">v{doc.version}</span>
+                                                  )}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                                                  <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    {formatDate(doc.uploaded_at)}
+                                                  </span>
+                                                  <span className="flex items-center gap-1">
+                                                    <User className="w-3 h-3" />
+                                                    <span className={doc.uploaded_by_user_id === currentUser.id ? 'text-primary font-medium' : ''}>
+                                                      {doc.uploaded_by_name ?? 'Unknown'}
+                                                    </span>
+                                                  </span>
+                                                  {doc.year ? <span>Year: {doc.year}</span> : null}
+                                                  <span>{formatFileSize(doc.file_size)}</span>
+                                                </div>
+                                              </div>
+
+                                              {/* Actions */}
+                                              <div className="flex items-center gap-2 flex-shrink-0">
+                                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleViewDocument(doc)}>
+                                                  <Eye className="w-3.5 h-3.5" /> View
+                                                </Button>
+                                                <Button
+                                                  variant="ghost" size="sm"
+                                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                  onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -724,7 +742,7 @@ export function AssociateDocuments() {
         </CardContent>
       </Card>
 
-      {/* ── Upload Modal ───────────────────────────────────────────────────── */}
+      {/* ── Upload Modal (original field order) ───────────────────────────── */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -739,151 +757,110 @@ export function AssociateDocuments() {
             <CardContent>
               <div className="space-y-4">
 
-                {/* STEP 1 — Category */}
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">Case *</label>
+                  <select
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={newDocument.case_id}
+                    onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}
+                  >
+                    <option value="0">Select a case...</option>
+                    {cases.map(c => <option key={c.id} value={c.id}>{c.case_number} - {c.title}</option>)}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Category *</label>
                   <select
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.document_category}
-                    onChange={e => setNewDocument(p => ({
-                      ...p,
-                      document_category: e.target.value,
-                      document_type: '',  // reset downstream fields
-                      case_id: 0,
-                    }))}
+                    onChange={e => setNewDocument(p => ({ ...p, document_category: e.target.value, document_type: '' }))}
                   >
                     <option value="">Select a category...</option>
-                    {Object.keys(documentCategories).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                    {Object.keys(documentCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
 
-                {/* STEP 2 — Document Type (revealed after category) */}
                 {newDocument.document_category && (
                   <div>
                     <label className="block mb-2 text-sm text-foreground">Document Type *</label>
                     <select
                       className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                       value={newDocument.document_type}
-                      onChange={e => setNewDocument(p => ({
-                        ...p,
-                        document_type: e.target.value,
-                        case_id: 0, // reset downstream
-                      }))}
+                      onChange={e => setNewDocument(p => ({ ...p, document_type: e.target.value }))}
                     >
                       <option value="">Select document type...</option>
-                      {availableSubTypes.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
+                      {availableSubTypes.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                 )}
 
-                {/* STEP 3 — Case (revealed after document type) */}
-                {newDocument.document_type && (
-                  <div>
-                    <label className="block mb-2 text-sm text-foreground">Associated Case *</label>
-                    <select
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={newDocument.case_id}
-                      onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}
-                    >
-                      <option value="0">Select a case...</option>
-                      {cases.map(c => (
-                        <option key={c.id} value={c.id}>{c.case_number} - {c.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* STEP 4 — Document Name (revealed after case) */}
-                {newDocument.case_id > 0 && (
-                  <div>
-                    <label className="block mb-2 text-sm text-foreground">Document Name *</label>
-                    <select
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={newDocument.name}
-                      onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
-                    >
-                      <option value="">Select document name</option>
-                      <option value="Payment to sheriff">Payment to sheriff</option>
-                      <option value="Payment from Client">Payment from Client</option>
-                    </select>
-                    <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
-                  </div>
-                )}
-
-                {/* STEP 5 — Year */}
-                {newDocument.case_id > 0 && (
-                  <div>
-                    <label className="block mb-2 text-sm text-foreground">Year</label>
-                    <input
-                      type="number"
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={newDocument.year}
-                      onChange={e => {
-                        const v = e.target.value;
-                        if (v === '' || (v.length <= 4 && /^\d+$/.test(v)))
-                          setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) }));
-                      }}
-                      max="9999" min="1000"
-                    />
-                  </div>
-                )}
-
-                {/* STEP 6 — File */}
-                {newDocument.case_id > 0 && (
-                  <div>
-                    <label className="block mb-2 text-sm text-foreground">File *</label>
-                    <input
-                      type="file"
-                      onChange={handleFileSelect}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <label htmlFor="file-upload">
-                      <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-                        {newDocument.file ? (
-                          <>
-                            <p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
-                            <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
-                            <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p>
-                          </>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-                )}
-
-                {/* STEP 7 — Description */}
-                {newDocument.case_id > 0 && (
-                  <div>
-                    <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
-                    <textarea
-                      placeholder="Add notes about this document..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                      value={newDocument.description}
-                      onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))}
-                    />
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="primary"
-                    className="gap-2"
-                    onClick={handleUploadDocument}
-                    disabled={uploading || !newDocument.file}
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">Document Name *</label>
+                  <select
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={newDocument.name}
+                    onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
                   >
+                    <option value="">Select document name</option>
+                    <option value="Payment to sheriff">Payment to sheriff</option>
+                    <option value="Payment from Client">Payment from Client</option>
+                  </select>
+                  <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">Year</label>
+                  <input
+                    type="number"
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={newDocument.year}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '' || (v.length <= 4 && /^\d+$/.test(v)))
+                        setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) }));
+                    }}
+                    max="9999" min="1000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">File *</label>
+                  <input type="file" onChange={handleFileSelect}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png"
+                    className="hidden" id="file-upload" />
+                  <label htmlFor="file-upload">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                      {newDocument.file ? (
+                        <>
+                          <p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
+                          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
+                  <textarea
+                    placeholder="Add notes about this document..."
+                    rows={3}
+                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                    value={newDocument.description}
+                    onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button variant="primary" className="gap-2" onClick={handleUploadDocument}
+                    disabled={uploading || !newDocument.file}>
                     {uploading
                       ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Uploading...</>
                       : <><Upload className="w-4 h-4" /> Upload Document</>}
@@ -892,7 +869,6 @@ export function AssociateDocuments() {
                     Cancel
                   </Button>
                 </div>
-
               </div>
             </CardContent>
           </Card>
@@ -924,8 +900,7 @@ export function AssociateDocuments() {
                 <div className="border border-border rounded-lg p-4">
                   <div className="text-sm text-muted-foreground mb-2">Image Preview:</div>
                   <div className="flex justify-center bg-muted/20 rounded-lg p-4">
-                    <img src={imagePreviewUrl} alt={viewingDocument.name}
-                      className="max-w-full max-h-[400px] object-contain" />
+                    <img src={imagePreviewUrl} alt={viewingDocument.name} className="max-w-full max-h-[400px] object-contain" />
                   </div>
                 </div>
               )}
@@ -952,7 +927,7 @@ export function AssociateDocuments() {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1">Case</label>
                   <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.case_title ?? getCaseTitle(viewingDocument.case_id)}
+                    {viewingDocument.case_title ?? getCaseLabel(viewingDocument.case_id)}
                   </div>
                 </div>
                 <div>
@@ -1009,7 +984,7 @@ export function AssociateDocuments() {
         </div>
       )}
 
-      {/* ── Guidelines ────────────────────────────────────────────────────── */}
+      {/* Guidelines */}
       <Card className="bg-gradient-to-br from-accent/5 to-transparent border-accent/20">
         <CardContent className="p-6">
           <div className="flex items-start gap-3">
@@ -1019,7 +994,7 @@ export function AssociateDocuments() {
             <div>
               <h3 className="text-foreground font-medium mb-1">Document Management Guidelines</h3>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• <strong>Browse:</strong> Click a category to expand it, then a document type to see its files.</li>
+                <li>• <strong>Browse:</strong> Click a category → document type → case to drill down to files.</li>
                 <li>• <strong>View:</strong> Click View on any file to see details. PDFs and images open in a new tab.</li>
                 <li>• <strong>Delete:</strong> Only delete documents uploaded by mistake.</li>
                 <li>• All company work product must be uploaded to the appropriate case file.</li>
