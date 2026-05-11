@@ -26,7 +26,7 @@ import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
 import { AssociateCalendar } from './AssociateCalendar';
 import { AuditLogs } from './AuditLogs';
-import dol from '../../assets/dolamo.png';
+import dol from '../../assets/dolamo.jpeg';
 
 interface AssociateLayoutProps {
   onLogout: () => void;
