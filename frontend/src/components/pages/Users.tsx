@@ -351,6 +351,7 @@ export function UserSettings() {
                               className="h-8 w-8 p-0 hover:bg-muted"
                               onClick={() => setEditingUser(user)}
                               disabled={isDeleting}
+                              aria-label="Edit associate"
                             >
                               <Edit className="h-4 w-4 text-muted-foreground" />
                             </Button>
@@ -360,6 +361,7 @@ export function UserSettings() {
                               className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-950/30"
                               onClick={() => handleDeleteUser(user)}
                               disabled={isDeleting}
+                              aria-label="Delete associate"
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
