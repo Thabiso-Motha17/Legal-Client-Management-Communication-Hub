@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { Building, Shield, Bell, Users, AlertCircle, MapPin, Phone, Globe, Plus, Edit, MoreVertical } from 'lucide-react';
+import { Building, Shield, Bell, Users, AlertCircle, MapPin, Phone, Globe, Plus, Edit, MoreVertical, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { LawFirm, CreateLawFirmData, UpdateLawFirmData } from '../../types/Types';
 import { apiRequest } from '../lib/api';
@@ -17,21 +17,22 @@ import { AddLawFirmModal } from './AddLawFirmModal';
 import { EditLawFirmModal } from './EditLawFirmModal';
 
 const useToast = () => {
-   const toast = (options: { title: string, description: string, variant?: string }) => {
-     if (options.variant === 'destructive') {
-       alert(`Error: ${options.title}\n${options.description}`);
-     } else {
-       alert(`Success: ${options.title}\n${options.description}`);
-     }
-   };
-   return { toast };
- };
+  const toast = (options: { title: string; description: string; variant?: string }) => {
+    if (options.variant === 'destructive') {
+      alert(`Error: ${options.title}\n${options.description}`);
+    } else {
+      alert(`Success: ${options.title}\n${options.description}`);
+    }
+  };
+  return { toast };
+};
 
 export function Settings() {
   const [lawFirms, setLawFirms] = useState<LawFirm[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFirm, setEditingFirm] = useState<LawFirm | null>(null);
+  const [deletingFirmId, setDeletingFirmId] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,26 +66,15 @@ export function Settings() {
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
         return false;
       }
 
-      toast({
-        title: 'Success',
-        description: 'Law firm created successfully',
-      });
+      toast({ title: 'Success', description: 'Law firm created successfully' });
       fetchLawFirms();
       return true;
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to create law firm',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to create law firm', variant: 'destructive' });
       return false;
     }
   };
@@ -97,27 +87,42 @@ export function Settings() {
       });
 
       if (result.error) {
-        toast({
-          title: 'Error',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
         return false;
       }
 
-      toast({
-        title: 'Success',
-        description: 'Law firm updated successfully',
-      });
+      toast({ title: 'Success', description: 'Law firm updated successfully' });
       fetchLawFirms();
       return true;
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update law firm',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to update law firm', variant: 'destructive' });
       return false;
+    }
+  };
+
+  const handleDeleteLawFirm = async (firmId: number, firmName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${firmName}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingFirmId(firmId);
+    try {
+      const result = await apiRequest(`/api/law-firms/${firmId}`, {
+        method: 'DELETE',
+      });
+
+      if (result.error) {
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Success', description: `"${firmName}" has been deleted` });
+      setLawFirms((prev) => prev.filter((f) => f.id !== firmId));
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete law firm', variant: 'destructive' });
+    } finally {
+      setDeletingFirmId(null);
     }
   };
 
@@ -130,18 +135,13 @@ export function Settings() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const formatLastActive = (dateString: string) => {
     const lastActive = new Date(dateString);
     const now = new Date();
-    const diffMs = now.getTime() - lastActive.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
@@ -157,16 +157,16 @@ export function Settings() {
   };
 
   const planColors = {
-    'Enterprise': 'bg-purple-500/10 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300',
-    'Professional': 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300',
-    'Starter': 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300'
+    Enterprise: 'bg-purple-500/10 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300',
+    Professional: 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300',
+    Starter: 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300',
   };
 
   const getStatus = (firm: LawFirm) => {
     const lastActive = new Date(firm.last_active_at);
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays > 30) return { status: 'inactive', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300' };
     if (diffDays > 7) return { status: 'warning', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' };
     return { status: 'active', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' };
@@ -191,7 +191,7 @@ export function Settings() {
             </div>
             <p className="text-2xl font-bold text-foreground">{lawFirms.length}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {lawFirms.filter(f => getStatus(f).status === 'active').length} active firms
+              {lawFirms.filter((f) => getStatus(f).status === 'active').length} active firms
             </p>
           </CardContent>
         </Card>
@@ -207,9 +207,7 @@ export function Settings() {
             <p className="text-2xl font-bold text-foreground">
               {lawFirms.reduce((sum, firm) => sum + (firm.member_count || 0), 0)}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Across all law firms
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Across all law firms</p>
           </CardContent>
         </Card>
 
@@ -224,9 +222,7 @@ export function Settings() {
             <p className="text-2xl font-bold text-foreground">
               {lawFirms.reduce((sum, firm) => sum + (firm.case_count || 0), 0)}
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Total cases across all firms
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Total cases across all firms</p>
           </CardContent>
         </Card>
       </div>
@@ -241,10 +237,7 @@ export function Settings() {
                 Manage law firms and their subscription plans
               </p>
             </div>
-            <Button 
-              onClick={() => setShowAddModal(true)}
-              className="gap-2"
-            >
+            <Button onClick={() => setShowAddModal(true)} className="gap-2">
               <Plus className="w-4 h-4" />
               Add New Firm
             </Button>
@@ -295,15 +288,19 @@ export function Settings() {
                   {lawFirms.map((firm) => {
                     const plan = calculatePlan(firm);
                     const status = getStatus(firm);
-                    
+                    const isDeleting = deletingFirmId === firm.id;
+
                     return (
-                      <tr key={firm.id} className="hover:bg-muted/30 transition-colors">
+                      <tr
+                        key={firm.id}
+                        className={`hover:bg-muted/30 transition-colors ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                               {firm.logo_url ? (
-                                <img 
-                                  src={firm.logo_url} 
+                                <img
+                                  src={firm.logo_url}
                                   alt={firm.name}
                                   className="w-8 h-8 rounded object-cover"
                                 />
@@ -335,9 +332,7 @@ export function Settings() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge
-                            className={`border ${planColors[plan as keyof typeof planColors]}`}
-                          >
+                          <Badge className={`border ${planColors[plan as keyof typeof planColors]}`}>
                             {plan}
                           </Badge>
                         </td>
@@ -348,9 +343,7 @@ export function Settings() {
                               <span className="text-sm font-medium text-foreground">{firm.member_count || 0}</span>
                               <span className="text-xs text-muted-foreground">members</span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {firm.case_count || 0} cases
-                            </div>
+                            <div className="text-xs text-muted-foreground">{firm.case_count || 0} cases</div>
                             <div className="text-xs text-muted-foreground">
                               {firm.storage_used_mb?.toFixed(1) || '0'} MB used
                             </div>
@@ -358,8 +351,11 @@ export function Settings() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Badge className={status.color}>
-                            {status.status === 'active' ? 'Active' : 
-                             status.status === 'warning' ? 'Warning' : 'Inactive'}
+                            {status.status === 'active'
+                              ? 'Active'
+                              : status.status === 'warning'
+                              ? 'Warning'
+                              : 'Inactive'}
                           </Badge>
                           {firm.last_active_at && (
                             <div className="text-xs text-muted-foreground mt-1">
@@ -368,14 +364,17 @@ export function Settings() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-foreground">
-                            {formatDate(firm.joined_date)}
-                          </div>
+                          <div className="text-sm text-foreground">{formatDate(firm.joined_date)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                disabled={isDeleting}
+                              >
                                 <span className="sr-only">Open menu</span>
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
@@ -387,11 +386,12 @@ export function Settings() {
                                 Edit Firm
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600">
-                                View Analytics
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
-                                Deactivate Firm
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                                onClick={() => handleDeleteLawFirm(firm.id, firm.name)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Firm
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -414,10 +414,10 @@ export function Settings() {
             <div>
               <h4 className="font-medium text-foreground mb-1">Compliance & Security Guidelines</h4>
               <p className="text-sm text-muted-foreground">
-                • All law firms must maintain compliance with local bar association rules and data protection regulations.<br/>
-                • Regular security audits are required for firms handling sensitive client data.<br/>
-                • Ensure that all member attorneys have valid licenses and that the firm maintains
-                adequate malpractice insurance as required by jurisdiction.<br/>
+                • All law firms must maintain compliance with local bar association rules and data protection regulations.<br />
+                • Regular security audits are required for firms handling sensitive client data.<br />
+                • Ensure that all member attorneys have valid licenses and that the firm maintains adequate malpractice
+                insurance as required by jurisdiction.<br />
                 • Monitor storage usage and case activity regularly to ensure optimal performance.
               </p>
             </div>

@@ -408,6 +408,7 @@ export interface CreateNoteData {
   tags?: string[];
   is_private?: boolean;
   law_firm_id?: number | null;
+  created_at?: string;
 }
 
 export interface UpdateNoteData {

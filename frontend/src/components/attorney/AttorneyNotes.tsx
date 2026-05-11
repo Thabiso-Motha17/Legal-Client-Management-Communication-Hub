@@ -339,7 +339,7 @@ export function AssociateNotes() {
                   }}
                   className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="">Select a case (optional)...</option>
+                  <option value="">Select a case</option>
                   {cases.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.case_number} - {c.title}
