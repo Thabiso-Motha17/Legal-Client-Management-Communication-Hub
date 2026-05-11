@@ -605,10 +605,6 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // For admins deleting users, check if user belongs to their law firm
-    if (req.user.role === 'admin' && user.law_firm_id !== req.user.lawFirmId) {
-      return res.status(403).json({ error: 'Cannot delete user from another law firm' });
-    }
 
     // Check if user is a client and has associated client records
     if (user.role === 'client') {
