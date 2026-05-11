@@ -223,8 +223,8 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
       <div className="border-b border-[#1f2130] bg-[#090b13]/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-2xl"/>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-full"/>
             </div>
             <span className="text-xl font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
               Dolamo Attorneys INC.
