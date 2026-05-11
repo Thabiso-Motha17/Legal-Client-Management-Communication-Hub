@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Buttons';
 import {
-  Shield,
   Eye,
   EyeOff,
   AlertCircle,
