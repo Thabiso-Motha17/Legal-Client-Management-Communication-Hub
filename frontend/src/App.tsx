@@ -146,8 +146,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Welcome/>} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Login />} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={
