@@ -219,9 +219,9 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-[#1a0f00] to-[#0d0800]">
+    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-[#060818] to-[#0d1023]">
       {/* Top bar */}
-      <div className="border-b border-amber-900/30 bg-black/20 backdrop-blur-sm">
+      <div className="border-b border-[#1f2130] bg-[#090b13]/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
@@ -235,7 +235,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
             variant="ghost"
             onClick={handleBackToWelcome}
             disabled={loading}
-            className="gap-2 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 border border-amber-800/40"
+            className="gap-2 text-amber-400 hover:text-amber-300 hover:bg-[#1f2130] border border-[#2a2d3a]"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Welcome
@@ -249,11 +249,11 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-4xl overflow-hidden rounded-2xl flex bg-[#0d0800] shadow-2xl shadow-amber-900/20 border border-amber-900/30"
+          className="w-full max-w-4xl overflow-hidden rounded-2xl flex bg-[#090b13] shadow-2xl border border-[#1f2130]"
         >
           {/* Left — dot map */}
-          <div className="hidden md:block w-1/2 h-[580px] relative overflow-hidden border-r border-amber-900/30">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#1a0c00] to-[#0d0800]">
+          <div className="hidden md:block w-1/2 h-[580px] relative overflow-hidden border-r border-[#1f2130]">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0f1120] to-[#151929]">
               <DotMap />
               <div className="absolute inset-0 flex flex-col items-center justify-center p-8 z-10">
                 <motion.div
@@ -278,7 +278,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8, duration: 0.5 }}
-                  className="text-sm text-center text-amber-200/50 max-w-xs"
+                  className="text-sm text-center text-gray-400 max-w-xs"
                 >
                   Sign in to access your secure legal portal and manage client cases with confidence.
                 </motion.p>
@@ -294,7 +294,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
               transition={{ duration: 0.5 }}
             >
               <h1 className="text-2xl md:text-3xl font-bold mb-1 text-white">Welcome back</h1>
-              <p className="text-amber-200/50 mb-8">Sign in to your account</p>
+              <p className="text-gray-400 mb-8">Sign in to your account</p>
 
               {error && (
                 <motion.div
@@ -310,7 +310,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Email */}
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-amber-200/70 mb-1">
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                     Email Address <span className="text-amber-400">*</span>
                   </label>
                   <input
@@ -322,14 +322,14 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                     required
                     disabled={loading}
                     autoComplete="email"
-                    className="w-full px-4 py-3 bg-[#1a0f00] border border-amber-900/40 rounded-lg text-amber-100 placeholder:text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-[#13151f] border border-[#2a2d3a] rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
                 {/* Password */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="password" className="text-sm font-medium text-amber-200/70">
+                    <label htmlFor="password" className="text-sm font-medium text-gray-300">
                       Password <span className="text-amber-400">*</span>
                     </label>
                     <button
@@ -352,13 +352,13 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                       disabled={loading}
                       autoComplete="current-password"
                       minLength={6}
-                      className="w-full px-4 py-3 pr-12 bg-[#1a0f00] border border-amber-900/40 rounded-lg text-amber-100 placeholder:text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full px-4 py-3 pr-12 bg-[#13151f] border border-[#2a2d3a] rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={loading}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-700 hover:text-amber-400 transition-colors disabled:opacity-50"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors disabled:opacity-50"
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -372,9 +372,9 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={loading}
-                    className="w-4 h-4 rounded border-amber-800 accent-amber-500 disabled:opacity-50"
+                    className="w-4 h-4 rounded border-[#2a2d3a] accent-amber-500 disabled:opacity-50"
                   />
-                  <span className="text-sm text-amber-200/60">Remember me on this device</span>
+                  <span className="text-sm text-gray-400">Remember me on this device</span>
                 </label>
 
                 {/* Submit */}
@@ -389,7 +389,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                     type="submit"
                     disabled={loading}
                     className={`w-full relative overflow-hidden flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 hover:from-yellow-300 hover:via-amber-400 hover:to-yellow-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isHovered ? 'shadow-lg shadow-amber-500/30' : ''
+                      isHovered ? 'shadow-lg shadow-amber-500/25' : ''
                     }`}
                   >
                     {loading ? (
@@ -421,8 +421,8 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-amber-900/30 bg-black/20">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-amber-200/30">
+      <div className="border-t border-[#1f2130] bg-[#090b13]/50">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
           <span>© 2026 Dolamo Attorneys INC. All rights reserved.</span>
           <div className="flex gap-6">
             {['Privacy Policy', 'Terms of Service', 'Support'].map((label) => (
