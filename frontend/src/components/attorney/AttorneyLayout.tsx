@@ -178,7 +178,7 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-600 flex items-center justify-center shadow">
-                  {dol}
+                  <img src={dol} alt="Dolamo" className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h2 className="text-sm font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-amber-600 bg-clip-text text-transparent">
