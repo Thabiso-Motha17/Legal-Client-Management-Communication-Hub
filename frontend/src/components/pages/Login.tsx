@@ -12,7 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { apiRequest } from '../lib/api';
 import type { LoginCredentials, AuthResponse } from '../../types/Types';
-import dolamo from '../../assets/dol.jpeg';
+import dolamo from '../../assets/dolamo.jpeg';
 
 const useToast = () => {
   const toast = (options: { title: string; description: string; variant?: string }) => {
@@ -224,7 +224,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-lg"/>
+              <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-xl"/>
             </div>
             <span className="text-xl font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
               Dolamo Attorneys INC.
@@ -262,7 +262,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                   className="mb-6"
                 >
                   <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                    <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-lg"  />
+                    <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-xl"  />
                   </div>
                 </motion.div>
                 <motion.h2
