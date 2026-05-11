@@ -261,7 +261,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                   transition={{ delay: 0.5, duration: 0.5 }}
                   className="mb-6"
                 >
-                  <div>
+                  <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                     <img src={dolamo} alt="Dolamo" className="w-full h-full object-cover rounded-lg"  />
                   </div>
                 </motion.div>
