@@ -272,7 +272,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                   transition={{ delay: 0.65, duration: 0.5 }}
                   className="text-3xl font-bold mb-2 text-center text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600"
                 >
-                  Dolamo Attorneys
+                  Dolamo Attorneys INC.
                 </motion.h2>
                 <motion.p
                   initial={{ opacity: 0, y: -20 }}
