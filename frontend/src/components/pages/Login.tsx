@@ -1,71 +1,168 @@
-import { useState} from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Buttons';
-import { Card, CardContent } from '../ui/Cards';
-import { 
-  Shield, 
-  Eye, 
-  EyeOff, 
-  AlertCircle, 
-  ArrowLeft, 
-  Briefcase, 
-  Lock,
-  ChevronDown,
-  Loader2
+import {
+  Shield,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { apiRequest } from '../lib/api';
-import type{ LoginCredentials, AuthResponse } from '../../types/Types';
+import type { LoginCredentials, AuthResponse } from '../../types/Types';
 
 const useToast = () => {
-   const toast = (options: { title: string, description: string, variant?: string }) => {
-     if (options.variant === 'destructive') {
-       alert(`Error: ${options.title}\n${options.description}`);
-     } else {
-       alert(`Success: ${options.title}\n${options.description}`);
-     }
-   };
-   return { toast };
- };
+  const toast = (options: { title: string; description: string; variant?: string }) => {
+    if (options.variant === 'destructive') {
+      alert(`Error: ${options.title}\n${options.description}`);
+    } else {
+      alert(`Success: ${options.title}\n${options.description}`);
+    }
+  };
+  return { toast };
+};
 
 interface LoginProps {
-  onLogin?: (role: 'associate' | 'admin' ) => void;
+  onLogin?: (role: 'associate' | 'admin') => void;
   onBackToWelcome?: () => void;
 }
 
-type UserRole =  'associate' | 'admin' ;
+// ---------------------------------------------------------------------------
+// Animated dot-map canvas (amber palette)
+// ---------------------------------------------------------------------------
+const DotMap = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
+  const routes = [
+    { start: { x: 100, y: 150, delay: 0 }, end: { x: 200, y: 80, delay: 2 }, color: '#f59e0b' },
+    { start: { x: 200, y: 80, delay: 2 }, end: { x: 260, y: 120, delay: 4 }, color: '#f59e0b' },
+    { start: { x: 50, y: 50, delay: 1 }, end: { x: 150, y: 180, delay: 3 }, color: '#f59e0b' },
+    { start: { x: 280, y: 60, delay: 0.5 }, end: { x: 180, y: 180, delay: 2.5 }, color: '#f59e0b' },
+  ];
+
+  const generateDots = (width: number, height: number) => {
+    const dots = [];
+    const gap = 12;
+    for (let x = 0; x < width; x += gap) {
+      for (let y = 0; y < height; y += gap) {
+        const inMap =
+          (x < width * 0.25 && x > width * 0.05 && y < height * 0.4 && y > height * 0.1) ||
+          (x < width * 0.25 && x > width * 0.15 && y < height * 0.8 && y > height * 0.4) ||
+          (x < width * 0.45 && x > width * 0.3 && y < height * 0.35 && y > height * 0.15) ||
+          (x < width * 0.5 && x > width * 0.35 && y < height * 0.65 && y > height * 0.35) ||
+          (x < width * 0.7 && x > width * 0.45 && y < height * 0.5 && y > height * 0.1) ||
+          (x < width * 0.8 && x > width * 0.65 && y < height * 0.8 && y > height * 0.6);
+        if (inMap && Math.random() > 0.3) {
+          dots.push({ x, y, radius: 1, opacity: Math.random() * 0.5 + 0.1 });
+        }
+      }
+    }
+    return dots;
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setDimensions({ width, height });
+      canvas.width = width;
+      canvas.height = height;
+    });
+    ro.observe(canvas.parentElement as Element);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!dimensions.width || !dimensions.height) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dots = generateDots(dimensions.width, dimensions.height);
+    let animId: number;
+    let startTime = Date.now();
+
+    const draw = () => {
+      ctx.clearRect(0, 0, dimensions.width, dimensions.height);
+      dots.forEach((d) => {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${d.opacity})`;
+        ctx.fill();
+      });
+
+      const t = (Date.now() - startTime) / 1000;
+      routes.forEach((route) => {
+        const elapsed = t - route.start.delay;
+        if (elapsed <= 0) return;
+        const progress = Math.min(elapsed / 3, 1);
+        const x = route.start.x + (route.end.x - route.start.x) * progress;
+        const y = route.start.y + (route.end.y - route.start.y) * progress;
+
+        ctx.beginPath();
+        ctx.moveTo(route.start.x, route.start.y);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = route.color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(route.start.x, route.start.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = route.color;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(251, 191, 36, 0.3)';
+        ctx.fill();
+
+        if (progress === 1) {
+          ctx.beginPath();
+          ctx.arc(route.end.x, route.end.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = route.color;
+          ctx.fill();
+        }
+      });
+
+      if (t > 15) startTime = Date.now();
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animId);
+  }, [dimensions]);
+
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Login component
+// ---------------------------------------------------------------------------
 export function Login({ onLogin, onBackToWelcome }: LoginProps) {
   const navigate = useNavigate();
-  const [role, setRole] = useState<UserRole>('associate');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const { toast } = useToast();
-
-  const roleConfig = {
-    associate: {
-      title: 'Associate Portal',
-      description: 'Manage client cases, track billable hours, and access legal resources',
-      icon: Briefcase,
-      placeholder: 'associate@example.com',
-      color: 'from-yellow-300 via-amber-400 to-yellow-600',
-      badgeColor: 'bg-yellow-100 text-yellow-800',
-      redirectPath: '/associate/dashboard'
-    },
-    admin: {
-      title: 'Administrator Portal',
-      description: 'System administration, user management, and firm analytics',
-      icon: Lock,
-      placeholder: 'admin@example.com',
-      color: 'from-yellow-300 via-amber-400 to-yellow-600',
-      badgeColor: 'bg-yellow-100 text-yellow-800',
-      redirectPath: '/admin/dashboard'
-    },
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,51 +170,24 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
     setLoading(true);
 
     try {
-      // Basic validation
-      if (!role) {
-        throw new Error('Please select a role');
-      }
+      if (!email || !password) throw new Error('Please enter both email and password');
+      if (!email.includes('@') || !email.includes('.')) throw new Error('Please enter a valid email address');
+      if (password.length < 6) throw new Error('Password must be at least 6 characters');
 
-      if (!email || !password) {
-        throw new Error('Please enter both email and password');
-      }
+      const loginData: LoginCredentials = { email: email.trim(), password: password.trim() };
 
-      if (!email.includes('@') || !email.includes('.')) {
-        throw new Error('Please enter a valid email address');
-      }
-
-      if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters');
-      }
-
-      // Prepare login data
-      const loginData: LoginCredentials = {
-        role,
-        email: email.trim(),
-        password: password.trim()
-      };
-
-      // Call the backend API
-      const result = await apiRequest<AuthResponse>(`/api/auth/login`, {
+      const result = await apiRequest<AuthResponse>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(loginData),
       });
 
-      if (result.error) {
-        throw new Error(result.error);
-      }
+      if (result.error) throw new Error(result.error);
+      if (!result.data?.token || !result.data?.user) throw new Error('Invalid response from server');
 
-      if (!result.data?.token || !result.data?.user) {
-        throw new Error('Invalid response from server');
-      }
-
-      // Store token and user data
       const { token, user } = result.data;
-      
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      
-      // If remember me is checked, store in longer-term storage
+
       if (rememberMe) {
         localStorage.setItem('rememberMe', 'true');
         localStorage.setItem('savedEmail', email);
@@ -126,93 +196,46 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
         localStorage.removeItem('savedEmail');
       }
 
+      if (onLogin) onLogin(user.role);
 
-      // Check if the user's role matches the selected portal
-      if (user.role !== role) {
-        console.warn(`User role (${user.role}) doesn't match selected portal (${role})`);
-        // You might want to handle this differently - maybe show a warning or auto-switch
-      }
-
-      // Determine redirect path based on user role
-      let redirectPath = '/dashboard';
-      switch (user.role) {
-        case 'associate':
-          redirectPath = '/associate/dashboard';
-          break;
-        case 'admin':
-          redirectPath = '/admin/dashboard';
-          break;
-      }
-
-      // Call the onLogin prop if provided (for backward compatibility)
-      if (onLogin) {
-        onLogin(user.role);
-      }
-
-      // Navigate to the appropriate dashboard
-      setTimeout(() => {
-        navigate(redirectPath);
-      }, 500);
-
-    } catch (error: any) {
-      console.error('Login error:', error);
-      const errorMessage = error.message || 'Login failed. Please check your credentials and try again.';
-      setError(errorMessage);
-      toast({
-        title: 'Login Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      const redirectPath = user.role === 'admin' ? '/admin/dashboard' : '/associate/dashboard';
+      setTimeout(() => navigate(redirectPath), 500);
+    } catch (err: any) {
+      const msg = err.message || 'Login failed. Please check your credentials and try again.';
+      setError(msg);
+      toast({ title: 'Login Failed', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRoleSelect = (selectedRole: UserRole) => {
-    setRole(selectedRole);
-    setIsDropdownOpen(false);
-    // Don't reset email - let user keep typing
-    setError('');
+  const handleBackToWelcome = () => {
+    if (onBackToWelcome) onBackToWelcome();
+    else navigate('/');
   };
 
   const handleForgotPassword = () => {
-    // Navigate to forgot password page or show modal
-    toast({
-      title: 'Password Reset',
-      description: 'Please contact your administrator to reset your password.',
-    });
+    toast({ title: 'Password Reset', description: 'Please contact your administrator to reset your password.' });
   };
-
-  const handleBackToWelcome = () => {
-    if (onBackToWelcome) {
-      onBackToWelcome();
-    } else {
-      navigate('/');
-    }
-  };
-
-
-  const currentConfig = roleConfig[role];
-  const Icon = currentConfig.icon;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <div className="border-b border-border bg-card">
+    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-[#1a0f00] to-[#0d0800]">
+      {/* Top bar */}
+      <div className="border-b border-amber-900/30 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
               <Shield className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
               Dolamo Attorneys INC.
             </span>
           </div>
-          <Button 
-            variant="ghost" 
-            onClick={handleBackToWelcome} 
-            className="gap-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+          <Button
+            variant="ghost"
+            onClick={handleBackToWelcome}
             disabled={loading}
+            className="gap-2 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 border border-amber-800/40"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Welcome
@@ -220,121 +243,100 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
         </div>
       </div>
 
-      {/* Login Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2 bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
-              Welcome Back
-            </h1>
-            <p className="text-stone-600">
-              Sign in to access your portal
-            </p>
+      {/* Main card */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-4xl overflow-hidden rounded-2xl flex bg-[#0d0800] shadow-2xl shadow-amber-900/20 border border-amber-900/30"
+        >
+          {/* Left — dot map */}
+          <div className="hidden md:block w-1/2 h-[580px] relative overflow-hidden border-r border-amber-900/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#1a0c00] to-[#0d0800]">
+              <DotMap />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-8 z-10">
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.5 }}
+                  className="mb-6"
+                >
+                  <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/40">
+                    <Shield className="text-white h-7 w-7" />
+                  </div>
+                </motion.div>
+                <motion.h2
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65, duration: 0.5 }}
+                  className="text-3xl font-bold mb-2 text-center text-transparent bg-clip-text bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600"
+                >
+                  Dolamo Attorneys
+                </motion.h2>
+                <motion.p
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8, duration: 0.5 }}
+                  className="text-sm text-center text-amber-200/50 max-w-xs"
+                >
+                  Sign in to access your secure legal portal and manage client cases with confidence.
+                </motion.p>
+              </div>
+            </div>
           </div>
 
-          <Card>
-            <CardContent className="p-8">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {error && (
-                  <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20 animate-in fade-in">
-                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-destructive">{error}</p>
-                  </div>
-                )}
+          {/* Right — form */}
+          <div className="w-full md:w-1/2 p-8 md:p-10 flex flex-col justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h1 className="text-2xl md:text-3xl font-bold mb-1 text-white">Welcome back</h1>
+              <p className="text-amber-200/50 mb-8">Sign in to your account</p>
 
-                {/* Role Selection Dropdown */}
-                <div>
-                  <label htmlFor="role" className="block mb-2 text-stone-700">
-                    Select Portal Type
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      disabled={loading}
-                      className="w-full px-4 py-3 bg-input-background border border-border rounded-lg flex items-center justify-between hover:border-stone-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentConfig.color} flex items-center justify-center`}>
-                          <Icon className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-stone-900 font-medium">{currentConfig.title}</span>
-                      </div>
-                      <ChevronDown className={`w-5 h-5 text-stone-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    
-                    {isDropdownOpen && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-border rounded-lg shadow-lg overflow-hidden animate-in fade-in">
-                        {Object.entries(roleConfig).map(([roleKey, config]) => {
-                          const RoleIcon = config.icon;
-                          return (
-                            <button
-                              key={roleKey}
-                              type="button"
-                              onClick={() => handleRoleSelect(roleKey as UserRole)}
-                              className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-stone-50 transition-colors ${
-                                role === roleKey ? 'bg-stone-50' : ''
-                              }`}
-                              disabled={loading}
-                            >
-                              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${config.color} flex items-center justify-center`}>
-                                <RoleIcon className="w-4 h-4 text-white" />
-                              </div>
-                              <div className="text-left">
-                                <p className="font-medium text-stone-900">{config.title}</p>
-                                <p className="text-xs text-stone-500 truncate max-w-[200px]">{config.description}</p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-stone-500 mt-2">
-                    {role === 'associate' && 'Manage client cases and track your work'}
-                    {role === 'admin' && 'System administration and user management'}
-                  </p>
-                </div>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 p-4 rounded-lg bg-red-900/20 border border-red-700/40 mb-6"
+                >
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-300">{error}</p>
+                </motion.div>
+              )}
 
-                {/* Email Field */}
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Email */}
                 <div>
-                  <label htmlFor="email" className="block mb-2 text-stone-700">
-                    Email Address
+                  <label htmlFor="email" className="block text-sm font-medium text-amber-200/70 mb-1">
+                    Email Address <span className="text-amber-400">*</span>
                   </label>
                   <input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={currentConfig.placeholder}
-                    className="w-full px-4 py-3 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                    autoComplete="email"
-                    disabled={loading}
+                    placeholder="you@example.com"
                     required
+                    disabled={loading}
+                    autoComplete="email"
+                    className="w-full px-4 py-3 bg-[#1a0f00] border border-amber-900/40 rounded-lg text-amber-100 placeholder:text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className={`text-xs px-2 py-1 rounded-full ${currentConfig.badgeColor}`}>
-                      {role === 'associate' && 'Associate Account'}
-                      {role === 'admin' && 'Admin Account'}
-                    </span>
-                    <span className="text-xs text-stone-500">
-                      {role === 'associate' && 'Use your law firm email'}
-                      {role === 'admin' && 'Use administrative account email'}
-                    </span>
-                  </div>
                 </div>
 
-                {/* Password Field */}
+                {/* Password */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label htmlFor="password" className="text-stone-700">
-                      Password
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="password" className="text-sm font-medium text-amber-200/70">
+                      Password <span className="text-amber-400">*</span>
                     </label>
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className="text-sm text-amber-600 hover:text-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={loading}
+                      className="text-sm text-amber-500 hover:text-amber-400 transition-colors disabled:opacity-50"
                     >
                       Forgot password?
                     </button>
@@ -346,150 +348,93 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="w-full px-4 py-3 pr-12 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                      autoComplete="current-password"
-                      disabled={loading}
                       required
-                      minLength={4}
+                      disabled={loading}
+                      autoComplete="current-password"
+                      minLength={6}
+                      className="w-full px-4 py-3 pr-12 bg-[#1a0f00] border border-amber-900/40 rounded-lg text-amber-100 placeholder:text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={loading}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-700 hover:text-amber-400 transition-colors disabled:opacity-50"
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
 
-                {/* Remember Me */}
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-border text-amber-500 focus:ring-2 focus:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={loading}
-                    />
-                    <span className="text-sm text-stone-700">Remember me on this device</span>
-                  </label>
-                </div>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 gap-2 text-white bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600
-                             hover:from-yellow-400 hover:via-amber-500 hover:to-yellow-700 shadow-md shadow-amber-500/30 
-                             transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Signing In...
-                    </>
-                  ) : (
-                    <>
-                      <Icon className="w-4 h-4" />
-                      Sign In to {currentConfig.title}
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <div className="mt-6 pt-6 border-t border-border">
-                <p className="text-sm text-center text-stone-600 mb-4">
-                  Need to access a different portal?{' '}
-                  <button 
-                    onClick={() => setIsDropdownOpen(true)}
-                    className="text-amber-600 hover:text-amber-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                {/* Remember me */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     disabled={loading}
-                  >
-                    Change portal type
-                  </button>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                    className="w-4 h-4 rounded border-amber-800 accent-amber-500 disabled:opacity-50"
+                  />
+                  <span className="text-sm text-amber-200/60">Remember me on this device</span>
+                </label>
 
-          {/* Role Info Cards */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(roleConfig).map(([roleKey, config]) => {
-              const RoleIcon = config.icon;
-              return (
-                <div 
-                  key={roleKey}
-                  className={`p-4 rounded-lg border transition-all ${role === roleKey ? 'border-amber-300 bg-amber-50/30 scale-105' : 'border-stone-200 bg-white hover:border-amber-200'}`}
+                {/* Submit */}
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onHoverStart={() => setIsHovered(true)}
+                  onHoverEnd={() => setIsHovered(false)}
+                  className="pt-1"
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-6 h-6 rounded-md bg-gradient-to-br ${config.color} flex items-center justify-center`}>
-                      <RoleIcon className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="text-xs font-medium text-stone-700">{config.title}</span>
-                  </div>
-                  <p className="text-xs text-stone-500">{config.description}</p>
-                </div>
-              );
-            })}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className={`w-full relative overflow-hidden flex items-center justify-center gap-2 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 hover:from-yellow-300 hover:via-amber-400 hover:to-yellow-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isHovered ? 'shadow-lg shadow-amber-500/30' : ''
+                    }`}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Signing In…
+                      </>
+                    ) : (
+                      <>
+                        Sign In
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                    {isHovered && !loading && (
+                      <motion.span
+                        initial={{ left: '-100%' }}
+                        animate={{ left: '100%' }}
+                        transition={{ duration: 1, ease: 'easeInOut' }}
+                        className="absolute top-0 bottom-0 w-20 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                        style={{ filter: 'blur(8px)' }}
+                      />
+                    )}
+                  </button>
+                </motion.div>
+              </form>
+            </motion.div>
           </div>
-
-          {/* Security Notice */}
-          <div className="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
-            <div className="flex gap-3">
-              <Shield className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-stone-700 mb-1">Secure Multi-Portal Access</p>
-                <p className="text-xs text-stone-500">
-                  Each portal provides role-specific access with appropriate permissions. 
-                  All activity is logged and monitored for security compliance.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Footer */}
-      <div className="border-t border-border bg-card">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-stone-500">
-          <div className="flex items-center gap-4">
-            <span>© 2026 Stand Firm. All rights reserved.</span>
-            <span className="hidden md:inline">•</span>
-            <span className="hidden md:inline">Version 3.2.1</span>
-          </div>
+      <div className="border-t border-amber-900/30 bg-black/20">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-amber-200/30">
+          <span>© 2026 Dolamo Attorneys INC. All rights reserved.</span>
           <div className="flex gap-6">
-            <button 
-              className="hover:text-amber-600 transition-colors disabled:opacity-50"
-              onClick={() => toast({
-                title: 'Privacy Policy',
-                description: 'Privacy policy details coming soon.',
-              })}
-              disabled={loading}
-            >
-              Privacy Policy
-            </button>
-            <button 
-              className="hover:text-amber-600 transition-colors disabled:opacity-50"
-              onClick={() => toast({
-                title: 'Terms of Service',
-                description: 'Terms of service details coming soon.',
-              })}
-              disabled={loading}
-            >
-              Terms of Service
-            </button>
-            <button 
-              className="hover:text-amber-600 transition-colors disabled:opacity-50"
-              onClick={() => toast({
-                title: 'Support',
-                description: 'Please contact support@standfirm.com for assistance.',
-              })}
-              disabled={loading}
-            >
-              Support
-            </button>
+            {['Privacy Policy', 'Terms of Service', 'Support'].map((label) => (
+              <button
+                key={label}
+                disabled={loading}
+                className="hover:text-amber-400 transition-colors disabled:opacity-50"
+                onClick={() => toast({ title: label, description: `${label} details coming soon.` })}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
