@@ -203,7 +203,6 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
     } catch (err: any) {
       const msg = err.message || 'Login failed. Please check your credentials and try again.';
       setError(msg);
-      toast({ title: 'Login Failed', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
