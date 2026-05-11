@@ -205,7 +205,7 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-semibold bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 bg-clip-text text-transparent">
-              Dolamo Attorneys
+              Dolamo Attorneys INC.
             </span>
           </div>
           <Button 

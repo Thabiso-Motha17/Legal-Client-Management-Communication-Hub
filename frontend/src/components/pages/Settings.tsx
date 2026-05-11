@@ -1,18 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Cards';
 import { Badge } from '../ui/Badges';
 import { Button } from '../ui/Buttons';
-import { Building, Shield, Bell, Users, AlertCircle, MapPin, Phone, Globe, Plus, Edit, MoreVertical, Trash2 } from 'lucide-react';
+import { Building, Shield, Bell, Users, AlertCircle, MapPin, Phone, Globe, Plus, Edit, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { LawFirm, CreateLawFirmData, UpdateLawFirmData } from '../../types/Types';
 import { apiRequest } from '../lib/api';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
 import { AddLawFirmModal } from './AddLawFirmModal';
 import { EditLawFirmModal } from './EditLawFirmModal';
 
@@ -367,34 +359,28 @@ export function Settings() {
                           <div className="text-sm text-foreground">{formatDate(firm.joined_date)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                disabled={isDeleting}
-                              >
-                                <span className="sr-only">Open menu</span>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => setEditingFirm(firm)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit Firm
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
-                                onClick={() => handleDeleteLawFirm(firm.id, firm.name)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Firm
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-muted"
+                              onClick={() => setEditingFirm(firm)}
+                              disabled={isDeleting}
+                              aria-label="Edit firm"
+                            >
+                              <Edit className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              onClick={() => handleDeleteLawFirm(firm.id, firm.name)}
+                              disabled={isDeleting}
+                              aria-label="Delete firm"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
