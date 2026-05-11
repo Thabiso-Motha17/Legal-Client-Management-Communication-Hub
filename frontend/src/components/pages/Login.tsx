@@ -12,7 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { apiRequest } from '../lib/api';
 import type { LoginCredentials, AuthResponse } from '../../types/Types';
-import dolamo from '../../assets/dolamo.png';
+import dolamo from '../../assets/dolamo.jpeg';
 
 const useToast = () => {
   const toast = (options: { title: string; description: string; variant?: string }) => {
