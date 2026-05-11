@@ -60,9 +60,9 @@ export function AssociateLayout({ onLogout }: AssociateLayoutProps) {
   // Define base navigation items
   const baseNavigation = [
     { id: 'dashboard', name: 'Dashboard', icon: Home },
+    { id: 'clients', name: 'Clients', icon: Users },
     { id: 'cases', name: 'My Cases', icon: Briefcase },
     { id: 'documents', name: 'Documents', icon: FileText },
-    { id: 'clients', name: 'Clients', icon: Users },
     { id: 'notes', name: 'Notes', icon: CheckCircle },
     { id: 'calendar', name: 'Calendar', icon: CalendarIcon }
 
