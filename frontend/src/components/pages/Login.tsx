@@ -126,11 +126,6 @@ export function Login({ onLogin, onBackToWelcome }: LoginProps) {
         localStorage.removeItem('savedEmail');
       }
 
-      // Show success message
-      toast({
-        title: 'Login Successful',
-        description: `Welcome back, ${user.full_name}!`,
-      });
 
       // Check if the user's role matches the selected portal
       if (user.role !== role) {
