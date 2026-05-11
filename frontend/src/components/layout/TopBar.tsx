@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../lib/api';
 import type { User as UserType } from '../../types/Types';
 
+
 interface TopBarProps {
   onNavigate?: (page: string) => void;
   onLogout?: () => void;
