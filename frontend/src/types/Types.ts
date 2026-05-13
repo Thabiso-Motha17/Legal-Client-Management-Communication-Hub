@@ -22,6 +22,7 @@ export interface LawFirm {
 export interface User {
   id: number;
   username: string;
+  password?: string;
   email: string;
   full_name: string;
   phone: string | null;
@@ -338,6 +339,7 @@ export interface CreateUserData {
 
 export interface UpdateUserData {
   full_name?: string;
+  password?: string;
   phone?: string;
   role?: 'admin' | 'associate' | 'client';
   law_firm_id?: number | null;

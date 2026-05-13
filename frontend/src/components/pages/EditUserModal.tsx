@@ -27,6 +27,7 @@ interface EditUserModalProps {
 export function EditUserModal({ isOpen, onClose, user, onSubmit }: EditUserModalProps) {
   const [formData, setFormData] = useState<UpdateUserData>({
     full_name: user.full_name,
+    password: user.password,
     phone: user.phone || undefined,
     role: user.role,
     is_active: user.is_active,
@@ -131,6 +132,17 @@ export function EditUserModal({ isOpen, onClose, user, onSubmit }: EditUserModal
                 value={user.email}
               />
               <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Password</label>
+              <input
+                type="password"
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground text-sm"
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                placeholder="Enter new password (leave blank to keep current)"
+              />
             </div>
 
             <div className="space-y-2">

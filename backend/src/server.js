@@ -557,7 +557,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
     }
 
     // Define allowed columns for update
-    const allowedColumns = ['full_name', 'phone', 'is_active'];
+    const allowedColumns = ['full_name','password', 'phone', 'is_active'];
     // Admins can update more fields
     if (req.user.role === 'admin') {
       allowedColumns.push('role', 'law_firm_id', 'permissions');
