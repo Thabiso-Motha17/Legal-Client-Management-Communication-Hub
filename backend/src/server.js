@@ -546,33 +546,90 @@ app.get('/api/users/:id', authenticateToken, async (req, res) => {
 });
 
 // Update user endpoint
+// ==================== UPDATE USER (FIXED) ====================
 app.put('/api/users/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
 
-    // Check access
+    // Check access: only the user themselves or an admin can update
     if (req.user.role !== 'admin' && req.user.id != id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Define allowed columns for update
-    const allowedColumns = ['full_name','password', 'phone', 'is_active'];
-    // Admins can update more fields
-    if (req.user.role === 'admin') {
-      allowedColumns.push('role', 'law_firm_id', 'permissions');
+    // Verify the user exists
+    const existingUser = await pool.query(
+      'SELECT id, role, law_firm_id FROM users WHERE id = $1',
+      [id]
+    );
+    if (existingUser.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
+    // Associates can only update users within their own law firm
+    if (req.user.role === 'associate') {
+      if (existingUser.rows[0].law_firm_id !== req.user.lawFirmId) {
+        return res.status(403).json({ error: 'Access denied: user belongs to a different law firm' });
+      }
+    }
+
+    // Define columns a regular user can update on their own account
+    const allowedColumns = ['full_name', 'phone'];
+
+    // Admins can update additional fields
+    if (req.user.role === 'admin') {
+      allowedColumns.push('is_active', 'role', 'law_firm_id', 'permissions');
+    }
+
+    // Handle password update separately so it can be hashed
+    if (updateData.password !== undefined) {
+      if (typeof updateData.password !== 'string' || updateData.password.trim().length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      }
+      updateData.password = await bcrypt.hash(updateData.password.trim(), 10);
+      allowedColumns.push('password');
+    }
+
+    // Validate role if admin is changing it
+    if (req.user.role === 'admin' && updateData.role !== undefined) {
+      const validRoles = ['admin', 'associate', 'client'];
+      if (!validRoles.includes(updateData.role)) {
+        return res.status(400).json({ error: 'Invalid role. Must be admin, associate, or client' });
+      }
+    }
+
+    // Validate permissions if being updated
+    if (updateData.permissions !== undefined) {
+      const validPermissions = ['full access', 'limited access', 'no access'];
+      if (!validPermissions.includes(updateData.permissions)) {
+        return res.status(400).json({ error: 'Invalid permissions value' });
+      }
+    }
+
+    // Build and run the update query
     const { query, values } = buildUpdateQuery('users', id, updateData, allowedColumns);
     const result = await pool.query(query, values);
 
-    res.json(result.rows[0]);
+    // Strip password from the response
+    const { password: _pw, ...safeUser } = result.rows[0];
+
+    res.json(safeUser);
   } catch (error) {
     console.error('Update user error:', error);
+
+    if (error.message === 'No valid update data provided') {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Email or username already exists' });
+    }
+    if (error.code === '23503') {
+      return res.status(400).json({ error: 'Invalid law firm reference' });
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
-
 // ==================== DELETE USER ====================
 app.delete('/api/users/:id', authenticateToken, async (req, res) => {
   try {
