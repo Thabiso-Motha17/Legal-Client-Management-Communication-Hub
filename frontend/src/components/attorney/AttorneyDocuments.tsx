@@ -797,15 +797,13 @@ export function AssociateDocuments() {
 
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Document Name *</label>
-                  <select
+                  <input
+                    type="text"
+                    placeholder="Enter document name"
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.name}
                     onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
-                  >
-                    <option value="">Select document name</option>
-                    <option value="Payment to sheriff">Payment to sheriff</option>
-                    <option value="Payment from Client">Payment from Client</option>
-                  </select>
+                  />
                   <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
                 </div>
 
