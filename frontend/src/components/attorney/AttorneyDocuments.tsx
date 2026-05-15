@@ -19,6 +19,9 @@ import {
   ExternalLink,
   FolderOpen,
   Folder,
+  Pencil,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import type { Document, CreateDocumentData, Case } from '../../types/Types';
 import { API_URL } from '../../api';
@@ -67,6 +70,8 @@ const documentCategories: Record<string, string[]> = {
   ],
 };
 
+const documentStatuses = ['Draft', 'Under Review', 'Approved', 'Reference', 'Rejected'];
+
 // Per-category colour tokens
 const categoryStyle: Record<string, { border: string; bg: string; text: string; iconBg: string }> = {
   'Personal Injury':          { border: 'border-l-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/20',    text: 'text-blue-700 dark:text-blue-400',    iconBg: 'bg-blue-100 dark:bg-blue-900/40'    },
@@ -77,21 +82,202 @@ const categoryStyle: Record<string, { border: string; bg: string; text: string; 
 };
 const fallbackStyle = { border: 'border-l-gray-400', bg: 'bg-gray-50 dark:bg-gray-900/20', text: 'text-gray-700 dark:text-gray-400', iconBg: 'bg-gray-100 dark:bg-gray-800' };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Edit Document Modal ───────────────────────────────────────────────────────
+function EditDocumentModal({
+  document: doc,
+  onClose,
+  onSave,
+}: {
+  document: Document;
+  onClose: () => void;
+  onSave: (id: number, data: Partial<Document>) => Promise<void>;
+}) {
+  const { category: initCategory, subType: initSubType } = (() => {
+    if (doc.document_type?.includes(' > ')) {
+      const idx = doc.document_type.indexOf(' > ');
+      return { category: doc.document_type.slice(0, idx).trim(), subType: doc.document_type.slice(idx + 3).trim() };
+    }
+    return { category: '', subType: doc.document_type ?? '' };
+  })();
+
+  const [name, setName]               = useState(doc.name);
+  const [category, setCategory]       = useState(initCategory);
+  const [subType, setSubType]         = useState(initSubType);
+  const [description, setDescription] = useState(doc.description ?? '');
+  const [status, setStatus]           = useState(doc.status);
+  const [version, setVersion]         = useState(doc.version ?? 1);
+  const [saving, setSaving]           = useState(false);
+  const [errors, setErrors]           = useState<Record<string, string>>({});
+
+  const availableSubTypes = category ? documentCategories[category] ?? [] : [];
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!name.trim())    e.name     = 'Document name is required';
+    if (!category)       e.category = 'Category is required';
+    if (!subType)        e.subType  = 'Document type is required';
+    if (version < 1)     e.version  = 'Version must be at least 1';
+    return e;
+  };
+
+  const handleSave = async () => {
+    const e = validate();
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    setSaving(true);
+    try {
+      await onSave(doc.id, {
+        name:          name.trim(),
+        document_type: `${category} > ${subType}`,
+        description,
+        status,
+        version,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fieldCls = (hasErr: boolean) =>
+    `w-full px-3 py-2 bg-input-background border rounded-lg focus:outline-none focus:ring-2 transition-colors text-sm ${
+      hasErr ? 'border-red-400 focus:ring-red-300' : 'border-border focus:ring-ring'
+    }`;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-xl bg-background border border-border rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
+              <Pencil className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Edit Document</h2>
+              <p className="text-xs text-muted-foreground truncate max-w-[260px]">{doc.file_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="px-6 py-5 space-y-4">
+
+          {/* Name */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Document Name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => { setName(e.target.value); setErrors(p => ({ ...p, name: '' })); }}
+              className={fieldCls(!!errors.name)}
+              placeholder="Enter document name"
+            />
+            {errors.name && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.name}</p>}
+          </div>
+
+          {/* Category */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Category *</label>
+            <select
+              value={category}
+              onChange={e => { setCategory(e.target.value); setSubType(''); setErrors(p => ({ ...p, category: '', subType: '' })); }}
+              className={fieldCls(!!errors.category)}
+            >
+              <option value="">Select a category...</option>
+              {Object.keys(documentCategories).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {errors.category && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.category}</p>}
+          </div>
+
+          {/* Document Type */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Document Type *</label>
+            <select
+              value={subType}
+              onChange={e => { setSubType(e.target.value); setErrors(p => ({ ...p, subType: '' })); }}
+              className={fieldCls(!!errors.subType)}
+              disabled={!category}
+            >
+              <option value="">{category ? 'Select document type...' : 'Select a category first'}</option>
+              {availableSubTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            {errors.subType && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.subType}</p>}
+          </div>
+
+          {/* Status + Version side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value as typeof status)}
+                className={fieldCls(false)}
+              >
+                {documentStatuses.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Version</label>
+              <input
+                type="number"
+                min={1}
+                value={version}
+                onChange={e => { setVersion(parseInt(e.target.value) || 1); setErrors(p => ({ ...p, version: '' })); }}
+                className={fieldCls(!!errors.version)}
+              />
+              {errors.version && <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{errors.version}</p>}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Description</label>
+            <textarea
+              rows={3}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Add notes about this document..."
+              className={`${fieldCls(false)} resize-none`}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="gap-2 min-w-[130px]">
+            {saving
+              ? <><div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />Saving...</>
+              : <><CheckCircle2 className="w-4 h-4" />Save Changes</>
+            }
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export function AssociateDocuments() {
 
-  // ── state ──────────────────────────────────────────────────────────────────
   const [documents, setDocuments] = useState<Document[]>([]);
   const [cases, setCases]         = useState<Case[]>([]);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // accordion open state — keyed by path string
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
   const [openTypes, setOpenTypes]           = useState<Record<string, boolean>>({});
   const [openCases, setOpenCases]           = useState<Record<string, boolean>>({});
 
-  // filters
   const [searchQuery, setSearchQuery]             = useState('');
   const [filterCase, setFilterCase]               = useState('all');
   const [filterCategory, setFilterCategory]       = useState('all');
@@ -101,13 +287,14 @@ export function AssociateDocuments() {
   const [filterDateTo, setFilterDateTo]           = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // modals
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
   const [showViewModal, setShowViewModal]     = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
-  // upload form
+  // ── edit state (new) ───────────────────────────────────────────────────────
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+
   const emptyForm = {
     name: '', case_id: 0, document_category: '', document_type: '',
     description: '', status: 'Draft', version: 1, file: null as File | null,
@@ -118,7 +305,6 @@ export function AssociateDocuments() {
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // ── data fetching ──────────────────────────────────────────────────────────
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
@@ -140,7 +326,6 @@ export function AssociateDocuments() {
     }
   };
 
-  // ── helpers ────────────────────────────────────────────────────────────────
   const parseDocumentType = (raw: string) => {
     if (raw?.includes(' > ')) {
       const idx = raw.indexOf(' > ');
@@ -193,7 +378,6 @@ export function AssociateDocuments() {
     }
   };
 
-  // ── stats ──────────────────────────────────────────────────────────────────
   const stats = {
     total:       documents.length,
     myDocuments: documents.filter(d => d.uploaded_by_user_id === currentUser.id).length,
@@ -201,7 +385,6 @@ export function AssociateDocuments() {
     approved:    documents.filter(d => d.status === 'Approved').length,
   };
 
-  // ── filtered documents ─────────────────────────────────────────────────────
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       const matchesSearch =
@@ -222,40 +405,31 @@ export function AssociateDocuments() {
     });
   }, [documents, searchQuery, filterCase, filterCategory, filterType, filterMyDocuments, filterDateFrom, filterDateTo, currentUser.id]);
 
-  // ── 4-level grouping: category → subType → caseId → docs[] ───────────────
   const grouped = useMemo(() => {
-    // Pre-seed known categories so empty ones still appear
     const map: Record<string, Record<string, Record<string, Document[]>>> = {};
     Object.keys(documentCategories).forEach(cat => { map[cat] = {}; });
-
     filteredDocuments.forEach(doc => {
       const { category, subType } = parseDocumentType(doc.document_type);
       const caseLabel = doc.case_title ?? getCaseLabel(doc.case_id);
-
-      if (!map[category])            map[category] = {};
-      if (!map[category][subType])   map[category][subType] = {};
-      if (!map[category][subType][caseLabel]) map[category][subType][caseLabel] = [];
+      if (!map[category])                         map[category] = {};
+      if (!map[category][subType])                map[category][subType] = {};
+      if (!map[category][subType][caseLabel])     map[category][subType][caseLabel] = [];
       map[category][subType][caseLabel].push(doc);
     });
-
     return map;
   }, [filteredDocuments, cases]);
 
-  // ── accordion toggles ──────────────────────────────────────────────────────
   const toggleCategory = (cat: string) =>
     setOpenCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
-
   const toggleType = (cat: string, type: string) => {
     const key = `${cat}||${type}`;
     setOpenTypes(prev => ({ ...prev, [key]: !prev[key] }));
   };
-
   const toggleCase = (cat: string, type: string, caseLabel: string) => {
     const key = `${cat}||${type}||${caseLabel}`;
     setOpenCases(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // ── upload ─────────────────────────────────────────────────────────────────
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -320,7 +494,6 @@ export function AssociateDocuments() {
     if (fi) fi.value = '';
   };
 
-  // ── view ───────────────────────────────────────────────────────────────────
   const handleViewDocument = async (doc: Document) => {
     setViewingDocument(doc);
     try {
@@ -347,7 +520,30 @@ export function AssociateDocuments() {
     } catch { setShowViewModal(true); }
   };
 
-  // ── delete ─────────────────────────────────────────────────────────────────
+  // ── edit save handler (new) ────────────────────────────────────────────────
+  const handleEditSave = async (id: number, data: Partial<Document>) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) { alert('Please login to continue'); window.location.href = '/login'; return; }
+      const response = await fetch(`${API_URL}/api/documents/${id}`, {
+        method:  'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data),
+      });
+      if (response.ok) {
+        const updated: Document = await response.json();
+        // Patch local state immediately — no full re-fetch needed
+        setDocuments(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
+        setEditingDocument(null);
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Failed to update document' }));
+        alert(`Error updating document: ${err.error ?? response.status}`);
+      }
+    } catch (err: any) {
+      alert(err.message ?? 'Failed to update document. Please try again.');
+    }
+  };
+
   const handleDeleteDocument = async (documentId: number, documentName: string) => {
     if (!window.confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) return;
     try {
@@ -378,7 +574,6 @@ export function AssociateDocuments() {
     ? documentCategories[newDocument.document_category] ?? []
     : [];
 
-  // ── loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="p-6 md:p-8 space-y-6">
@@ -393,9 +588,17 @@ export function AssociateDocuments() {
     );
   }
 
-  // ── render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 md:p-8 space-y-6">
+
+      {/* ── Edit Modal (new) ─────────────────────────────────────────────── */}
+      {editingDocument && (
+        <EditDocumentModal
+          document={editingDocument}
+          onClose={() => setEditingDocument(null)}
+          onSave={handleEditSave}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -567,7 +770,6 @@ export function AssociateDocuments() {
         </CardHeader>
 
         <CardContent className="p-4 space-y-3">
-
           {filteredDocuments.length === 0 && (
             <div className="py-16 text-center">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -583,7 +785,7 @@ export function AssociateDocuments() {
             </div>
           )}
 
-          {/* ── LEVEL 1: Category ─────────────────────────────────────────── */}
+          {/* LEVEL 1: Category */}
           {Object.entries(grouped).map(([category, typeMap]) => {
             const totalInCat = Object.values(typeMap).flatMap(t => Object.values(t)).flat().length;
             const isCatOpen  = !!openCategories[category];
@@ -591,8 +793,6 @@ export function AssociateDocuments() {
 
             return (
               <div key={category} className={`rounded-xl border border-border border-l-4 ${cs.border} overflow-hidden shadow-sm`}>
-
-                {/* Category header */}
                 <button
                   onClick={() => toggleCategory(category)}
                   className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isCatOpen ? cs.bg : 'hover:bg-muted/30'}`}
@@ -609,21 +809,19 @@ export function AssociateDocuments() {
                   {isCatOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
                 </button>
 
-                {/* ── LEVEL 2: Document Type ──────────────────────────────── */}
+                {/* LEVEL 2: Document Type */}
                 {isCatOpen && (
                   <div className="border-t border-border divide-y divide-border/60">
                     {Object.keys(typeMap).length === 0 ? (
                       <p className="text-sm text-muted-foreground italic px-14 py-4">No documents in this category yet</p>
                     ) : (
                       Object.entries(typeMap).map(([docType, caseMap]) => {
-                        const typeKey    = `${category}||${docType}`;
-                        const isTypeOpen = !!openTypes[typeKey];
+                        const typeKey     = `${category}||${docType}`;
+                        const isTypeOpen  = !!openTypes[typeKey];
                         const totalInType = Object.values(caseMap).flat().length;
 
                         return (
                           <div key={docType} className="bg-muted/5">
-
-                            {/* Type header */}
                             <button
                               onClick={() => toggleType(category, docType)}
                               className="w-full flex items-center justify-between pl-14 pr-5 py-3 text-left hover:bg-muted/25 transition-colors"
@@ -638,7 +836,7 @@ export function AssociateDocuments() {
                               </div>
                             </button>
 
-                            {/* ── LEVEL 3: Case ───────────────────────────── */}
+                            {/* LEVEL 3: Case */}
                             {isTypeOpen && (
                               <div className="border-t border-border/40 divide-y divide-border/30">
                                 {Object.entries(caseMap).map(([caseLabel, docs]) => {
@@ -647,8 +845,6 @@ export function AssociateDocuments() {
 
                                   return (
                                     <div key={caseLabel} className="bg-muted/10">
-
-                                      {/* Case header */}
                                       <button
                                         onClick={() => toggleCase(category, docType, caseLabel)}
                                         className="w-full flex items-center justify-between pl-20 pr-5 py-2.5 text-left hover:bg-muted/30 transition-colors"
@@ -663,7 +859,7 @@ export function AssociateDocuments() {
                                         </div>
                                       </button>
 
-                                      {/* ── LEVEL 4: Files ──────────────── */}
+                                      {/* LEVEL 4: Files */}
                                       {isCaseOpen && (
                                         <div className="border-t border-border/30 bg-background divide-y divide-border/20">
                                           {docs.map(doc => (
@@ -671,20 +867,14 @@ export function AssociateDocuments() {
                                               key={doc.id}
                                               className="flex items-center gap-4 pl-28 pr-5 py-3 hover:bg-muted/15 transition-colors"
                                             >
-                                              {/* File icon */}
                                               <span className="text-lg flex-shrink-0">
                                                 {getFileIcon(doc.file_name, doc.mime_type)}
                                               </span>
 
-                                              {/* File info */}
                                               <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                  <span className="text-sm font-medium text-foreground truncate">
-                                                    {doc.name}
-                                                  </span>
-                                                  <Badge variant={getStatusVariant(doc.status)}>
-                                                    {doc.status}
-                                                  </Badge>
+                                                  <span className="text-sm font-medium text-foreground truncate">{doc.name}</span>
+                                                  <Badge variant={getStatusVariant(doc.status)}>{doc.status}</Badge>
                                                   {doc.uploaded_by_user_id === currentUser.id && (
                                                     <Badge variant="default" className="text-xs">My Upload</Badge>
                                                   )}
@@ -694,8 +884,7 @@ export function AssociateDocuments() {
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
                                                   <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {formatDate(doc.uploaded_at)}
+                                                    <Calendar className="w-3 h-3" />{formatDate(doc.uploaded_at)}
                                                   </span>
                                                   <span className="flex items-center gap-1">
                                                     <User className="w-3 h-3" />
@@ -708,11 +897,24 @@ export function AssociateDocuments() {
                                                 </div>
                                               </div>
 
-                                              {/* Actions */}
+                                              {/* ── Actions: View | Edit (new) | Delete ── */}
                                               <div className="flex items-center gap-2 flex-shrink-0">
-                                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handleViewDocument(doc)}>
+                                                <Button
+                                                  variant="outline" size="sm" className="gap-1.5"
+                                                  onClick={() => handleViewDocument(doc)}
+                                                >
                                                   <Eye className="w-3.5 h-3.5" /> View
                                                 </Button>
+
+                                                {/* Edit button — new */}
+                                                <Button
+                                                  variant="outline" size="sm"
+                                                  className="gap-1.5 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                                                  onClick={() => setEditingDocument(doc)}
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5" /> Edit
+                                                </Button>
+
                                                 <Button
                                                   variant="ghost" size="sm"
                                                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -742,7 +944,7 @@ export function AssociateDocuments() {
         </CardContent>
       </Card>
 
-      {/* ── Upload Modal (original field order) ───────────────────────────── */}
+      {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -756,72 +958,49 @@ export function AssociateDocuments() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Case *</label>
-                  <select
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.case_id}
-                    onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}
-                  >
+                  <select className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={newDocument.case_id} onChange={e => setNewDocument(p => ({ ...p, case_id: parseInt(e.target.value) }))}>
                     <option value="0">Select a case...</option>
                     {cases.map(c => <option key={c.id} value={c.id}>{c.case_number} - {c.title}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Category *</label>
-                  <select
-                    className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                  <select className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.document_category}
-                    onChange={e => setNewDocument(p => ({ ...p, document_category: e.target.value, document_type: '' }))}
-                  >
+                    onChange={e => setNewDocument(p => ({ ...p, document_category: e.target.value, document_type: '' }))}>
                     <option value="">Select a category...</option>
                     {Object.keys(documentCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
-
                 {newDocument.document_category && (
                   <div>
                     <label className="block mb-2 text-sm text-foreground">Document Type *</label>
-                    <select
-                      className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                    <select className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                       value={newDocument.document_type}
-                      onChange={e => setNewDocument(p => ({ ...p, document_type: e.target.value }))}
-                    >
+                      onChange={e => setNewDocument(p => ({ ...p, document_type: e.target.value }))}>
                       <option value="">Select document type...</option>
                       {availableSubTypes.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                 )}
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Document Name *</label>
-                  <input
-                    type="text"
-                    placeholder="Enter document name"
+                  <input type="text" placeholder="Enter document name"
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={newDocument.name}
-                    onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))}
-                  />
+                    value={newDocument.name} onChange={e => setNewDocument(p => ({ ...p, name: e.target.value }))} />
                   <small className="text-xs text-muted-foreground mt-1">Will default to filename if left empty</small>
                 </div>
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Year</label>
-                  <input
-                    type="number"
+                  <input type="number"
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                     value={newDocument.year}
-                    onChange={e => {
-                      const v = e.target.value;
-                      if (v === '' || (v.length <= 4 && /^\d+$/.test(v)))
-                        setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) }));
-                    }}
-                    max="9999" min="1000"
-                  />
+                    onChange={e => { const v = e.target.value; if (v === '' || (v.length <= 4 && /^\d+$/.test(v))) setNewDocument(p => ({ ...p, year: v === '' ? '' : parseInt(v) })); }}
+                    max="9999" min="1000" />
                 </div>
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">File *</label>
                   <input type="file" onChange={handleFileSelect}
@@ -831,41 +1010,28 @@ export function AssociateDocuments() {
                     <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
                       <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
                       {newDocument.file ? (
-                        <>
-                          <p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p>
-                        </>
+                        <><p className="text-sm text-foreground mb-1">{newDocument.file.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(newDocument.file_size)} • Click to change</p></>
                       ) : (
-                        <>
-                          <p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
-                          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p>
-                        </>
+                        <><p className="text-sm text-foreground mb-1">Click to upload or drag and drop</p>
+                          <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, XLS, XLSX, TXT, JPG, PNG (max 25MB)</p></>
                       )}
                     </div>
                   </label>
                 </div>
-
                 <div>
                   <label className="block mb-2 text-sm text-foreground">Description (Optional)</label>
-                  <textarea
-                    placeholder="Add notes about this document..."
-                    rows={3}
+                  <textarea placeholder="Add notes about this document..." rows={3}
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                    value={newDocument.description}
-                    onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))}
-                  />
+                    value={newDocument.description} onChange={e => setNewDocument(p => ({ ...p, description: e.target.value }))} />
                 </div>
-
                 <div className="flex gap-2 pt-2">
-                  <Button variant="primary" className="gap-2" onClick={handleUploadDocument}
-                    disabled={uploading || !newDocument.file}>
+                  <Button variant="primary" className="gap-2" onClick={handleUploadDocument} disabled={uploading || !newDocument.file}>
                     {uploading
                       ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Uploading...</>
                       : <><Upload className="w-4 h-4" /> Upload Document</>}
                   </Button>
-                  <Button variant="outline" onClick={() => { setShowUploadModal(false); resetUploadForm(); }}>
-                    Cancel
-                  </Button>
+                  <Button variant="outline" onClick={() => { setShowUploadModal(false); resetUploadForm(); }}>Cancel</Button>
                 </div>
               </div>
             </CardContent>
@@ -873,7 +1039,7 @@ export function AssociateDocuments() {
         </div>
       )}
 
-      {/* ── View Document Modal ────────────────────────────────────────────── */}
+      {/* View Document Modal */}
       {showViewModal && viewingDocument && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -893,7 +1059,6 @@ export function AssociateDocuments() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-
               {imagePreviewUrl && (
                 <div className="border border-border rounded-lg p-4">
                   <div className="text-sm text-muted-foreground mb-2">Image Preview:</div>
@@ -902,75 +1067,46 @@ export function AssociateDocuments() {
                   </div>
                 </div>
               )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Category</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {parseDocumentType(viewingDocument.document_type).category || '—'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Document Type</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {parseDocumentType(viewingDocument.document_type).subType || viewingDocument.document_type}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Status</label>
-                  <div className="px-3 py-2">
-                    <Badge variant={getStatusVariant(viewingDocument.status)}>{viewingDocument.status}</Badge>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Case</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.case_title ?? getCaseLabel(viewingDocument.case_id)}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Uploaded By</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.uploaded_by_name ?? 'Unknown'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Year</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.year ?? 'Unknown'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Upload Date</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {formatDate(viewingDocument.uploaded_at)}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">File Size</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {formatFileSize(viewingDocument.file_size)}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">File Type</label>
-                  <div className="px-3 py-2 bg-input-background rounded border border-border">
-                    {viewingDocument.file_type || viewingDocument.mime_type || 'Unknown'}
-                  </div>
-                </div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Category</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{parseDocumentType(viewingDocument.document_type).category || '—'}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Document Type</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{parseDocumentType(viewingDocument.document_type).subType || viewingDocument.document_type}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Status</label>
+                  <div className="px-3 py-2"><Badge variant={getStatusVariant(viewingDocument.status)}>{viewingDocument.status}</Badge></div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Case</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{viewingDocument.case_title ?? getCaseLabel(viewingDocument.case_id)}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Uploaded By</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{viewingDocument.uploaded_by_name ?? 'Unknown'}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Year</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{viewingDocument.year ?? 'Unknown'}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">Upload Date</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{formatDate(viewingDocument.uploaded_at)}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">File Size</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{formatFileSize(viewingDocument.file_size)}</div></div>
+                <div><label className="block text-sm font-medium text-foreground mb-1">File Type</label>
+                  <div className="px-3 py-2 bg-input-background rounded border border-border">{viewingDocument.file_type || viewingDocument.mime_type || 'Unknown'}</div></div>
                 {viewingDocument.description && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-                    <div className="px-3 py-2 bg-input-background rounded border border-border min-h-[80px]">
-                      {viewingDocument.description}
-                    </div>
-                  </div>
+                  <div className="md:col-span-2"><label className="block text-sm font-medium text-foreground mb-1">Description</label>
+                    <div className="px-3 py-2 bg-input-background rounded border border-border min-h-[80px]">{viewingDocument.description}</div></div>
                 )}
               </div>
-
               <div className="flex gap-3 pt-4 border-t border-border">
                 <Button variant="outline" className="gap-2" onClick={() => handleViewDocument(viewingDocument)}>
                   <ExternalLink className="w-4 h-4" /> Open in New Tab
+                </Button>
+                {/* Edit shortcut from view modal — new */}
+                <Button
+                  variant="outline"
+                  className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setEditingDocument(viewingDocument);
+                    setViewingDocument(null);
+                    setImagePreviewUrl(null);
+                  }}
+                >
+                  <Pencil className="w-4 h-4" /> Edit
                 </Button>
                 <Button variant="ghost"
                   onClick={() => { setShowViewModal(false); setViewingDocument(null); setImagePreviewUrl(null); }}>
@@ -994,6 +1130,7 @@ export function AssociateDocuments() {
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• <strong>Browse:</strong> Click a category → document type → case to drill down to files.</li>
                 <li>• <strong>View:</strong> Click View on any file to see details. PDFs and images open in a new tab.</li>
+                <li>• <strong>Edit:</strong> Update the document name, category, type, status, version, or description.</li>
                 <li>• <strong>Delete:</strong> Only delete documents uploaded by mistake.</li>
                 <li>• All company work product must be uploaded to the appropriate case file.</li>
                 <li>• File size must be under 25MB.</li>
